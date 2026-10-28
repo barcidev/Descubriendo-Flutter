@@ -1,13 +1,15 @@
 # Guion · Descubriendo Flutter
 
 Tiempo total: 45 minutos. Cada sección es un comando de Flutter.
+Las excusas y las preguntas las escoge Gemini en el servidor (GEMINI_API_KEY); sin clave, o si falla, hay plan B.
 Teclas: → siguiente · ← anterior · Q QR gigante · X rayos X · T tema · S público de ensayo · 1–9 mano alzada · B pausa · O vista general · G ir a · L cerrar sesión.
 
 ## doctor · Antes de empezar, un chequeo · mientras la gente llega
 - Déjala proyectada mientras entran. La terminal hace el «flutter doctor» de la sala.
 - Repite en voz alta: «escaneen el QR, un solo escaneo sirve para toda la charla».
 - Si alguien no puede escanear: oprime Q (QR gigante) o lee la dirección.
-- Al entrar, a cada persona le toca un widget como identidad. Pregúntale a alguien cuál le tocó.
+- Al entrar, cada persona escribe su nombre y le toca un widget: ese es su apodo. Los nombres van apareciendo en la terminal («Llegó Ana → Expanded()»).
+- Pregúntale a alguien cuál le tocó. Diles que guarden el nombre para el final: salen en los créditos.
 
 ## calentamiento · ¿Con qué haces software hoy? · antes de empezar
 - Votación abierta: dales 30 segundos.
@@ -47,7 +49,8 @@ Teclas: → siguiente · ← anterior · Q QR gigante · X rayos X · T tema · 
 ## hecha-con-flutter · ¿Hecha con Flutter?
 - Paso 1: votación de selección múltiple, 40 segundos. «Sin googlear».
 - Paso 2: se voltean las tarjetas. Google Pay, Nubank, My BMW y NotebookLM sí; WhatsApp, Uber e Instagram no.
-- Paso 3: la trampa. «Esta presentación es una app de Flutter corriendo en Chrome».
+- Paso 3: la trampa. La tarjeta de «Esta presentación» se va al centro y se voltea: «es una app de Flutter corriendo en Chrome».
+- Desde aquí la barra de abajo muestra «Flutter 3.47 · Dart 3.13»: antes no había nada que lo delatara.
 - Oprime X: rayos X sobre el árbol real de widgets. Ciérralos con X otra vez.
 
 ## devices · flutter devices · 3 min (sección)
@@ -60,11 +63,9 @@ Teclas: → siguiente · ← anterior · Q QR gigante · X rayos X · T tema · 
 - Para la gente de la JVM: Nubank tiene una cultura fuerte de Clojure y aun así usa Flutter en el celular.
 
 ## si-depende-no · ¿Sí, depende o no? · 5 min (sección)
-- Seis escenarios. Cada uno: un clic abre la votación (20 s) y otro revela la respuesta.
-- Startup iOS + Android: sí. Marca propia: sí. Blog/SEO: no. Juego 3D: no (Flame para 2D sí).
-- Lo último de iOS el primer día: depende. Carro/TV: sí (Toyota, LG).
-- Si vas tarde, haz solo 3 escenarios y salta con G.
-
+- Cuatro escenarios. Cada uno: un clic abre la votación (20 s) y otro revela la respuesta.
+- Startup iOS + Android: sí. Blog o tienda que vive del SEO: no.
+- Lo último de iOS el mismo día: depende (código nativo y canales de plataforma). Carro o TV: sí (Toyota, LG).
 ## issues-found · 3 issues found
 - El resumen honesto como salida de «flutter analyze».
 - Paso 2, dato honesto: la página de su celular NO es Flutter; para tres botones, HTML es mejor.
@@ -79,6 +80,7 @@ Teclas: → siguiente · ← anterior · Q QR gigante · X rayos X · T tema · 
 
 ## armemos-una-tarjeta · Armemos una tarjeta
 - Cinco pasos: Text, Column, Card con Padding, Row con ícono, FilledButton.
+- El código es el de verdad: la vista previa corre exactamente ese código, en una pantalla de celular ampliada.
 - Mira cómo las líneas se deslizan: cada paso envuelve al anterior.
 - En el último paso dale clic a «Otra excusa» en la vista previa: es real.
 - Chiste: «la firma de todo dev de Flutter: ),),),». Tip: closing labels del editor.
@@ -88,20 +90,20 @@ Teclas: → siguiente · ← anterior · Q QR gigante · X rayos X · T tema · 
 - Paso 2: el mismo contador en Jetpack Compose. Para la gente de Kotlin es casi idéntico.
 
 ## excusometro-en-vivo · Excusómetro en vivo
-- Pide que manden su mejor excusa de dev desde el celular.
-- Apruébalas en esta página (abajo, «Excusas por revisar»). Al aprobar, la tarjeta cambia en pantalla.
-- Mensaje: llega un dato, cambia el estado, Flutter repinta. Nadie tocó la tarjeta.
-
+- Un minuto en pantalla para mandar su mejor excusa desde el celular (hasta tres por persona). Mientras tanto gira la ruleta de la culpa.
+- Si ya escribieron todos, un clic cierra antes. Si se acaba el tiempo, la charla pasa sola al paso 2.
+- Paso 2: una IA (Gemini) hace «code review» y escoge las más populares, las más graciosas y la más rara. Sin categorías.
+- Si la IA falla o nadie escribe, salen excusas de respaldo (costeñas) mezcladas con las reales. Nadie lo nota.
+- Mensaje: llega un dato, cambia el estado, Flutter repinta. Nadie tocó las tarjetas.
+- Si algo sale en pantalla que no debe, quítalo aquí abajo («Excusas en pantalla» → Quitar).
 ## contador · El contador más grande del mundo
 - «Aprieten el + en el celular, todo lo que puedan».
 - Es el contador de flutter create, pero lo aprietan ellos.
 
 ## hot-reload · Hot reload en vivo
-- Pide que sigan apretando. Cambia a VS Code y al simulador con la app contador (ver PREPARACION).
-- En contador/lib/main.dart: seedColor de Colors.deepPurple a Color(0xFF027DFD) y el título por la mejor excusa. Guarda.
-- Señala: cambió en menos de un segundo y el número NO volvió a cero.
-- Vuelve a Chrome: paso 2 muestra el código del antes y el después.
-
+- Pide que sigan apretando. El celular de la diapositiva es la plantilla de flutter create con su contador.
+- Paso 2: cambia el color y el título en el código y el celular de la diapositiva cambia igual, sin perder el número.
+- Después hazlo de verdad: VS Code y el simulador con la app contador (ver PREPARACION). seedColor a Color(0xFF027DFD) y el título por la mejor excusa. Guarda.
 ## por-que-tan-rapido · ¿Por qué tan rápido?
 - JIT mientras programas (hot reload), AOT en producción (código máquina), JS o Wasm en web.
 
@@ -133,48 +135,43 @@ Teclas: → siguiente · ← anterior · Q QR gigante · X rayos X · T tema · 
 ## estructura · Paso 3: la estructura
 - Carpetas por funcionalidad. Mapeo con Spring: data ≈ repository, application ≈ service, presentation ≈ controller.
 
-## estado · Paso 4: el estado
-- setState alcanza para una pantalla; para una app, un gestor (Riverpod, Bloc…). Elige uno.
-
-## api-kotlin · Paso 5: hablar con una API en Kotlin
-- Paso 1: el controlador en Kotlin (Spring Boot). Paso 2: el contrato JSON.
-- Paso 3: el cliente en Dart con http y fromJson.
-- Paso 4: petición real a /excusas del servidor de la charla. Muestra el tiempo en ms y las excusas que mandaron.
-
-## errores-tipados · Cuando la API falla
-- 401, 429, sin red: cada uno es un caso. sealed + switch en Dart, sealed + when en Kotlin.
-
-## navegacion-paquetes · Pasos 6 y 7
-- go_router en pocas líneas. Cómo elegir un paquete en pub.dev: likes, pub points (de 160), publicador verificado.
-
-## tests · Paso 8: tests
-- testWidgets corre la UI sin celular. Chiste: «Fue culpa mía: findsNothing, nunca pasa».
-
-## publicar · Paso 9: publicar y el tema
+## api-kotlin · Paso 4: hablar con una API en Kotlin
+- Paso 1: el controlador en Kotlin (Spring Boot). Paso 2: el contrato JSON, el de verdad de GET /excusas, con la primera excusa que salió en pantalla.
+- Paso 3: el cliente en Dart con http y fromJson. Es el código que hace la petición del paso 4.
+- Paso 4: petición real a /excusas del servidor de la charla: son las mismas excusas que eligió la IA.
+- Si preguntan por errores: la línea del statusCode lanza una excepción y FutureBuilder la muestra en su estado de error. Con eso basta para empezar.
+## paquetes · Paso 5: paquetes
+- pub.dev es a Flutter lo que Maven Central a Spring y npm a Node: mismo concepto, otro nombre de archivo.
+- Lo diferente: cada paquete trae nota. Pub points (de 160, análisis automático), likes, descargas, publicador verificado y Flutter Favorite.
+## publicar · Paso 6: publicar y el tema
 - Un comando por tienda.
 - Votación «¿claro u oscuro?». Paso 2: la charla aplica sola el tema ganador.
-
+- Paso 3, el chiste: si ganó el claro, «git revert tema-claro» y vuelve el oscuro («democracia sí, pero esta charla es mía»). Si ganó el oscuro: «¿por qué los devs usan modo oscuro? Porque la luz atrae a los bugs».
 ## recomendaciones · Recomendaciones · 3 min (sección)
 - #0: «¿ya probaste flutter clean?».
 - Tres clics: antes de empezar, mientras construyes, antes de publicar.
+- En «un solo gestor de estado» nombra Provider, Riverpod y Bloc: el que sea, pero uno.
 
 ## por-donde-empezar · Por dónde empezar
 - DartPad, el codelab oficial, Widget of the Week, pub.dev.
 - Invita a la comunidad local: BAQ JUG, CaribeDev, DevJVM.
 
 ## demo · La demo · 3 min (sección)
+- La terminal «compila», el simulador de la diapositiva arranca y abre EcoEats: es la app real, versión web, corriendo dentro de la charla contra la API en Kotlin.
+- Haz clic en el celular y recórrela: login con JWT, catálogo, búsqueda sin tildes («camaron»), detalle, tema e idioma.
+- El clicker sigue funcionando con la app en foco (PgUp y PgDn).
 - Paso 2 muestra los números de EcoEats: 3 días, 213 commits, 96 widgets, 407 tests.
-- Cambia al simulador iPhone 16e, donde EcoEats ya tiene la sesión iniciada. Recorre: catálogo, búsqueda sin tildes («camaron»), detalle, modo Descubrir, tema e idioma.
-- Para mostrar el login con JWT contra la API en Kotlin, cierra sesión desde el perfil y vuelve a entrar.
-- Plan B: si el simulador falla, cuéntalo con esta diapositiva y los números de la app.
-
+- La app en el simulador del Mac va al final, después de los créditos.
 ## preguntas · Preguntas · 4 min (sección)
-- Pide que escriban y apoyen preguntas en el celular.
-- Aprueba las buenas aquí abajo; márcalas «Respondida» al contestarlas.
-
-## calificacion · La calificación · 1 min (sección)
-- «Califiquen el deploy»: de «Segmentation fault» a «Deploy un viernes y nada se rompió».
-
+- Las preguntas llegan toda la charla. Al entrar aquí, una IA escoge cinco que cubran la mayoría de dudas, sin repetir y sin editarlas.
+- La espera dura al menos 10 segundos: el FutureBuilder «esperando stdin». Aprovecha para pedir que escriban la suya.
+- Sin preguntas: «stdin vacío», y pide manos.
+- Si algo no debe salir, quítalo aquí abajo («Preguntas en pantalla» → Quitar).
+## creditos · Los créditos · 1 min (sección)
+- Pantalla completa, como en el cine: la charla en números, el elenco (el público con su nombre y su apodo), los organizadores y tu foto.
+- Escena post-créditos: «¿Creyeron que todo esto eran diapositivas? Era un mock: N widgets haciéndose pasar por PowerPoint.» Un mock es lo que en los tests se hace pasar por otra cosa: eso eran las diapositivas.
+- Cinco segundos después, el Mac trae al frente el simulador (con presentar.sh) y la charla pasa sola al cierre. Muestra la app de verdad.
+- Sin presentar.sh, la charla sale de pantalla completa: cambia al simulador con Cmd+Tab.
 ## application-finished · Application finished.
-- Gracias, contacto y agradecimiento a los organizadores.
+- Al volver del simulador ya está aquí: gracias, la calificación en vivo («Califiquen el deploy») y los organizadores.
 - Deja esta diapositiva mientras sales.

@@ -6,6 +6,7 @@ import 'package:material_ui/material_ui.dart';
 import '../engine/overview.dart';
 import '../theme/deck_theme.dart';
 import '../theme/tokens.dart';
+import 'reveal.dart';
 
 enum TermTone { plain, muted, accent, success, warning, danger }
 
@@ -19,17 +20,22 @@ class TermLine {
     this.text, {
     this.tone = TermTone.plain,
     this.pause = const Duration(milliseconds: 90),
+    this.id,
   }) : command = false;
 
   const TermLine.command(
     this.text, {
     this.pause = const Duration(milliseconds: 600),
   }) : command = true,
-       tone = TermTone.plain;
+       tone = TermTone.plain,
+       id = null;
 
   final String text;
   final bool command;
   final TermTone tone;
+
+  /// Identifica una línea que llega en vivo, para animar solo las nuevas.
+  final Object? id;
 
   /// La espera antes de que aparezca (o de que empiece a escribirse).
   final Duration pause;
@@ -43,10 +49,18 @@ class Terminal extends StatefulWidget {
     this.onDone,
     this.fontSize = 24,
     this.minLines = 0,
+    this.extra = const [],
+    this.maxLines,
     super.key,
   });
 
   final List<TermLine> lines;
+
+  /// Líneas que llegan en vivo, después del guion: entran deslizándose.
+  final List<TermLine> extra;
+
+  /// Si hay más líneas, las viejas se van por arriba, como en una terminal.
+  final int? maxLines;
   final String title;
 
   /// Se reproduce sola al aparecer. Si no, se muestra completa.
@@ -117,11 +131,23 @@ class _TerminalState extends State<Terminal> {
       color: CodeColors.plain,
     );
     final lineHeight = widget.fontSize * 1.45;
-    final visible = [
+    final rows = [
       for (var index = 0; index < _shown; index++) _line(widget.lines[index], colors),
       if (!_done && widget.lines[_shown].command && _typed > 0)
         _command(widget.lines[_shown].text.substring(0, _typed), colors, typing: true),
+      if (_done)
+        for (final line in widget.extra)
+          EnterOnce(
+            key: ValueKey(line.id ?? line.text),
+            from: const Offset(0.04, 0),
+            child: _line(line, colors),
+          ),
+      if (_done) _command('', colors, typing: false, idle: true),
     ];
+    final cap = widget.maxLines;
+    final visible = cap == null || rows.length <= cap
+        ? rows
+        : rows.sublist(rows.length - cap);
     return DecoratedBox(
       decoration: BoxDecoration(
         color: CodeColors.background,
@@ -154,10 +180,7 @@ class _TerminalState extends State<Terminal> {
                 style: style,
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    ...visible,
-                    if (_done) _command('', colors, typing: false, idle: true),
-                  ],
+                  children: visible,
                 ),
               ),
             ),

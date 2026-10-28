@@ -64,6 +64,20 @@ class _WebBrowser implements Browser {
       web.window.open(url, name, 'width=1440,height=900');
 
   @override
+  Future<bool> showDemoApps() async {
+    try {
+      final response = await web.window
+          .fetch('/mac/demo'.toJS, web.RequestInit(method: 'POST'))
+          .toDart;
+      if (response.status == 204) return true;
+    } on Object {
+      // Sin servidor local: se cambia de app a mano.
+    }
+    if (web.document.fullscreenElement != null) web.document.exitFullscreen();
+    return false;
+  }
+
+  @override
   MessageChannel channel(String name) => _WebChannel(name);
 }
 

@@ -13,6 +13,8 @@ Consultadas el 28 de octubre de 2026.
 | 2015, «Sky»: Dart en Android, con 120 fps como meta | Dart Developer Summit 2015 (cobertura de Android Police) |
 | Ubuntu: el instalador y la tienda de apps (App Center) están hechos en Flutter | https://ubuntu.com/blog/flutter-and-ubuntu-so-far |
 | 81.705 paquetes en pub.dev | https://pub.dev/packages |
+| Pub points (hasta 160), publicador verificado y Flutter Favorite | https://pub.dev/help/scoring · https://dart.dev/tools/pub/verified-publishers · https://docs.flutter.dev/packages-and-plugins/favorites |
+| `gemini-flash-latest` apunta al Flash estable más reciente | https://ai.google.dev/gemini-api/docs/changelog |
 | Dash es un colibrí | https://docs.flutter.dev/dash |
 | Versión estable cada trimestre | CHANGELOG.md del SDK 3.47.8 |
 | Salida real de `flutter run` y `flutter devices` | Capturada en este portátil |

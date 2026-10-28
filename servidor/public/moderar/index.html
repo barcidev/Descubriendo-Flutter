@@ -72,11 +72,11 @@
         <div class="cifra"><b id="contador">0</b><span>toques</span></div>
         <div class="cifra"><b id="estrellas">–</b><span>estrellas</span></div>
       </div>
-      <div class="grupo"><h2>Excusas por revisar</h2><ul class="lista" id="excusasPendientes"></ul></div>
-      <div class="grupo"><h2>Preguntas por revisar</h2><ul class="lista" id="preguntasPendientes"></ul></div>
-      <div class="grupo"><h2>Preguntas en pantalla</h2><ul class="lista" id="preguntasAprobadas"></ul></div>
-      <div class="grupo"><h2>Excusas en pantalla</h2><ul class="lista" id="excusasAprobadas"></ul></div>
+      <div class="grupo"><h2 id="tituloExcusas">Excusas en pantalla</h2><ul class="lista" id="excusasElegidas"></ul></div>
+      <div class="grupo"><h2 id="tituloPreguntas">Preguntas en pantalla</h2><ul class="lista" id="preguntasElegidas"></ul></div>
       <button class="boton" id="reiniciar" type="button">Reiniciar el contador</button>
+      <button class="boton" id="reiniciarExcusas" type="button" style="background:var(--raised)">Repetir la ronda de excusas</button>
+      <button class="boton" id="reiniciarPreguntas" type="button" style="background:var(--raised)">Volver a elegir las preguntas</button>
       <button class="boton" id="salir" type="button" style="background:var(--raised)">Cerrar sesión en este celular</button>
     </section>
   </main>
@@ -242,36 +242,18 @@
         $('conectados').textContent = estado.connected;
         $('contador').textContent = estado.counter;
         $('estrellas').textContent = estado.rating.total ? estado.rating.average.toFixed(1) : '–';
+        // La IA escoge; aquí solo se puede quitar algo que no debe salir.
+        const ronda = (r, tipo) => (r.picks || []).map((elegida) => fila(elegida.texto, elegida.apodo, [
+          ['Quitar', 'no', () => enviar({ t: 'quitar', tipo, id: elegida.id })],
+        ]));
+        const excusas = estado.excuseRound || {};
+        const preguntas = estado.questionRound || {};
+        $('tituloExcusas').textContent = `Excusas en pantalla · ${excusas.received || 0} recibidas · ${excusas.phase || ''}`;
+        $('tituloPreguntas').textContent = `Preguntas en pantalla · ${preguntas.received || 0} recibidas · ${preguntas.phase || ''}`;
         const listas = {
-          excusasPendientes: [], preguntasPendientes: [], preguntasAprobadas: [], excusasAprobadas: [],
+          excusasElegidas: ronda(excusas, 'excusa'),
+          preguntasElegidas: ronda(preguntas, 'pregunta'),
         };
-        for (const excusa of estado.excuses) {
-          if (excusa.hidden) continue;
-          const decidir = (t) => () => enviar({ t, tipo: 'excusa', id: excusa.id });
-          if (excusa.approved) {
-            listas.excusasAprobadas.push(fila(excusa.text, excusa.author, [['Quitar', 'no', decidir('ocultar')]]));
-          } else {
-            listas.excusasPendientes.push(fila(excusa.text, excusa.author, [
-              ['Aprobar', 'si', decidir('aprobar')], ['Ocultar', 'no', decidir('ocultar')],
-            ]));
-          }
-        }
-        const preguntas = [...estado.questions].sort((a, b) => b.votes - a.votes);
-        for (const pregunta of preguntas) {
-          if (pregunta.hidden) continue;
-          const decidir = (t) => () => enviar({ t, tipo: 'pregunta', id: pregunta.id });
-          const autor = `${pregunta.author} · +${pregunta.votes}${pregunta.done ? ' · respondida' : ''}`;
-          if (pregunta.approved) {
-            listas.preguntasAprobadas.push(fila(pregunta.text, autor, [
-              [pregunta.done ? 'Reabrir' : 'Respondida', '', () => enviar({ t: 'respondida', id: pregunta.id })],
-              ['Quitar', 'no', decidir('ocultar')],
-            ]));
-          } else {
-            listas.preguntasPendientes.push(fila(pregunta.text, autor, [
-              ['Aprobar', 'si', decidir('aprobar')], ['Ocultar', 'no', decidir('ocultar')],
-            ]));
-          }
-        }
         for (const [id, items] of Object.entries(listas)) {
           const lista = $(id);
           lista.replaceChildren(...items);
@@ -285,6 +267,12 @@
 
       $('reiniciar').addEventListener('click', () => {
         if (confirm('¿Reiniciar el contador a cero?')) enviar({ t: 'reiniciar', que: 'contador' });
+      });
+      $('reiniciarExcusas').addEventListener('click', () => {
+        if (confirm('¿Repetir la ronda de excusas? Se abre de nuevo al volver a la diapositiva.')) enviar({ t: 'reiniciar', que: 'excusas' });
+      });
+      $('reiniciarPreguntas').addEventListener('click', () => {
+        if (confirm('¿Volver a elegir las preguntas? Se eligen al volver a la diapositiva.')) enviar({ t: 'reiniciar', que: 'preguntas' });
       });
     })();
   </script>

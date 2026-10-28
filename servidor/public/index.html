@@ -19,15 +19,26 @@
   </header>
 
   <main>
+    <section class="bienvenida" id="bienvenida" hidden>
+      <p class="etiqueta">Descubriendo Flutter</p>
+      <h1>¿Cómo te llamas?</h1>
+      <p class="ayuda">Tu nombre aparece en la pantalla de la charla. Y guárdalo para el final: hay sorpresa.</p>
+      <form id="formNombre" class="formulario">
+        <input id="textoNombre" type="text" maxlength="28" autocomplete="given-name" autocapitalize="words" enterkeyhint="go" placeholder="Tu nombre" required>
+        <button type="submit" class="boton">Entrar</button>
+        <p class="nota" id="notaNombre"></p>
+      </form>
+    </section>
+
     <section class="yo" id="yo" hidden>
-      <p class="etiqueta">Hoy eres</p>
+      <p class="etiqueta" id="saludo">Hoy eres</p>
       <h1 class="widget"><span id="widget"></span><span class="parentesis">()</span></h1>
       <p class="frase" id="frase"></p>
     </section>
 
     <section id="pantalla" class="pantalla" aria-live="polite"></section>
 
-    <details class="preguntar" id="preguntar">
+    <details class="preguntar" id="preguntar" hidden>
       <summary>¿Tienes una pregunta? Escríbela cuando quieras</summary>
       <form id="formPregunta" class="formulario">
         <textarea id="textoPregunta" maxlength="200" rows="3" placeholder="Tu pregunta para el final de la charla"></textarea>

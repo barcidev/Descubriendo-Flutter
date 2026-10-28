@@ -1,6 +1,6 @@
 import 'dart:math' as math;
 
-import 'package:flutter/widgets.dart';
+import 'package:material_ui/material_ui.dart';
 import 'package:path_parsing/path_parsing.dart';
 
 import '../theme/deck_theme.dart';
@@ -71,7 +71,11 @@ enum AppBrand {
   ),
 
   /// El ícono que trae toda app recién salida de `flutter create`.
-  flutter('Flutter', background: Color(0xFFFFFFFF), scale: 0.56);
+  flutter('Flutter', background: Color(0xFFFFFFFF), scale: 0.56),
+
+  /// «Esta presentación» antes de voltearse: un ícono cualquiera de
+  /// diapositivas, para no delatar que es Flutter.
+  slides('Presentación', background: Color(0xFF3A4A63), icon: Icons.slideshow, scale: 0.56);
 
   const AppBrand(
     this.name, {
@@ -79,6 +83,7 @@ enum AppBrand {
     this.background,
     this.gradient,
     this.glyph = const Color(0xFFFFFFFF),
+    this.icon,
     required this.scale,
   });
 
@@ -89,6 +94,9 @@ enum AppBrand {
   final Color? background;
   final Gradient? gradient;
   final Color glyph;
+
+  /// Un ícono de Material en vez de un logo.
+  final IconData? icon;
 
   /// Qué parte del ícono ocupa el logo, en su lado más largo.
   final double scale;
@@ -120,7 +128,9 @@ class AppIcon extends StatelessWidget {
             width: Space.hairline,
           ),
         ),
-        child: brand == AppBrand.flutter
+        child: brand.icon != null
+            ? Icon(brand.icon, color: brand.glyph, size: size * brand.scale)
+            : brand == AppBrand.flutter
             ? Padding(
                 padding: EdgeInsets.all(size * (1 - brand.scale) / 2),
                 child: Image.asset(

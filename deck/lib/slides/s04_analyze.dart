@@ -21,19 +21,9 @@ const _scenarios = <_Scenario>[
     reason: 'Un código, un equipo, dos tiendas. Es el caso de libro.',
   ),
   (
-    text: 'Una app con identidad visual propia y animaciones hechas a medida.',
-    answer: 'si',
-    reason: 'Flutter pinta cada píxel: tu diseño se ve igual en todas partes.',
-  ),
-  (
     text: 'Un blog o una tienda que vive de aparecer en Google.',
     answer: 'no',
     reason: 'Para SEO y contenido gana la web de siempre. Flutter web brilla en apps.',
-  ),
-  (
-    text: 'Un juego 3D con gráficos de consola.',
-    answer: 'no',
-    reason: 'Unity o Unreal. Para juegos 2D casuales, Flame sobre Flutter sí.',
   ),
   (
     text: 'Una app que necesita lo último de iOS el mismo día que sale.',

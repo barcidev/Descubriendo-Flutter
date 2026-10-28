@@ -27,6 +27,11 @@ abstract interface class Browser {
 
   void openWindow(String url, String name);
 
+  /// Al final de los créditos: le pide al servidor local (presentar.sh) que
+  /// traiga al frente el IDE y el simulador del Mac. Si no hay servidor
+  /// local, sale de pantalla completa para cambiar de app a mano.
+  Future<bool> showDemoApps();
+
   MessageChannel channel(String name);
 }
 

@@ -1,6 +1,10 @@
+import 'dart:async';
 import 'dart:convert';
+import 'dart:io' show stdout;
 import 'dart:math' as math;
 
+import 'filtro.dart';
+import 'jurado.dart';
 import 'personas.dart';
 
 typedef Reloj = DateTime Function();
@@ -51,40 +55,62 @@ class Cubeta {
   }
 }
 
+/// Alguien del público: su nombre (para los créditos del final) y el
+/// widget que le tocó, que es su apodo durante la charla.
+class Asistente {
+  Asistente(this.persona);
+
+  final Persona persona;
+  String? nombre;
+}
+
 /// Una excusa o una pregunta escrita por el público.
 class Texto {
   Texto({
     required this.id,
     required this.texto,
-    required this.autor,
+    required this.apodo,
     required this.cliente,
   });
 
-  final String id;
+  final int id;
   final String texto;
-  final String autor;
+  final String apodo;
   final String cliente;
-  bool aprobada = false;
-  bool oculta = false;
-  bool respondida = false;
-  final apoyos = <String>{};
 
-  Map<String, Object?> publica() => {
-        'id': id,
-        'text': texto,
-        'author': autor,
-        'votes': apoyos.length,
-        'done': respondida,
-      };
-
-  Map<String, Object?> completa() => {
-        ...publica(),
-        'approved': aprobada,
-        'hidden': oculta,
-      };
+  /// El contrato de `GET /excusas`: lo mismo que muestra la charla.
+  Map<String, Object?> toJson() => {'id': id, 'texto': texto, 'apodo': apodo};
 }
 
-const _modos = {'idle', 'poll', 'counter', 'excuse', 'questions', 'rating'};
+enum Fase { cerrada, abierta, eligiendo, lista }
+
+/// Una ronda de excusas o de preguntas: se reciben textos y, al cerrar, el
+/// jurado escoge los que salen en pantalla.
+class RondaDeTextos {
+  RondaDeTextos(this.ronda);
+
+  final Ronda ronda;
+  final textos = <Texto>[];
+  Fase fase = Fase.cerrada;
+  DateTime? cierre;
+  List<Map<String, Object?>> elegidas = const [];
+
+  /// Si la elección la hizo la IA (o el plan B).
+  bool porIA = false;
+
+  /// Cambia al reiniciar: una elección vieja que llegue tarde se ignora.
+  int generacion = 0;
+}
+
+const _modos = {
+  'idle',
+  'poll',
+  'counter',
+  'excuse',
+  'questions',
+  'rating',
+  'credits',
+};
 const _reaccionesValidas = {'fuego', 'bug', 'aplauso'};
 final _idValido = RegExp(r'^[A-Za-z0-9_-]{8,64}$');
 
@@ -92,9 +118,14 @@ final _idValido = RegExp(r'^[A-Za-z0-9_-]{8,64}$');
 /// que escribió el público. No sabe nada de HTTP: recibe textos y manda
 /// textos, así se puede probar sin red.
 class Sala {
-  Sala({math.Random? azar}) : _azar = azar ?? math.Random();
+  Sala({math.Random? azar, Reloj? reloj, Jurado? jurado})
+      : _azar = azar ?? math.Random(),
+        _reloj = reloj ?? DateTime.now,
+        _jurado = jurado;
 
   final math.Random _azar;
+  final Reloj _reloj;
+  final Jurado? _jurado;
 
   final _audiencia = <Conexion>{};
   final _presentadores = <Conexion>{};
@@ -109,11 +140,18 @@ class Sala {
   final _opciones = <String, List<String>>{};
   final _multiple = <String, bool>{};
   int _contador = 0;
-  final _excusas = <Texto>[];
-  final _preguntas = <Texto>[];
+  final _excusas = RondaDeTextos(Ronda.excusas);
+  final _preguntas = RondaDeTextos(Ronda.preguntas);
   final _estrellas = <String, int>{};
   final _reacciones = {for (final r in _reaccionesValidas) r: 0};
-  final _personas = <String, Persona>{};
+
+  /// Por cliente, en orden de llegada.
+  final _asistentes = <String, Asistente>{};
+
+  /// Las últimas personas que dijeron su nombre, para la terminal del
+  /// inicio: `{n, nombre, widget}`, con `n` creciente.
+  final _llegadas = <Map<String, Object?>>[];
+  int _llegada = 0;
 
   /// En qué diapositiva va la charla, para el guion del presentador.
   Map<String, Object?> _diapositiva = const {};
@@ -126,6 +164,9 @@ class Sala {
   int get contador => _contador;
 
   String get modo => _cue['mode']! as String;
+
+  RondaDeTextos get excusas => _excusas;
+  RondaDeTextos get preguntas => _preguntas;
 
   void entrar(Conexion conexion) {
     (conexion.presentador ? _presentadores : _audiencia).add(conexion);
@@ -165,7 +206,7 @@ class Sala {
       return;
     }
     if (conexion.presentador) {
-      _comando(json);
+      _comando(conexion, json);
     } else {
       _publico(conexion, json);
     }
@@ -174,6 +215,10 @@ class Sala {
   /// Cada pocos milisegundos: si algo cambió, todos reciben el estado nuevo.
   /// Se serializa una sola vez por grupo, no una vez por celular.
   void tick() {
+    if (_excusas.fase == Fase.abierta &&
+        !_reloj().isBefore(_excusas.cierre!)) {
+      unawaited(_elegir(_excusas));
+    }
     final reacciones = Map.of(_reacciones);
     final hayReacciones = reacciones.values.any((n) => n > 0);
     if (!_cambio && !hayReacciones) return;
@@ -191,11 +236,9 @@ class Sala {
     _cambio = false;
   }
 
-  /// Las excusas que ya pasaron la moderación, para la demo de FutureBuilder.
-  List<Map<String, Object?>> excusasAprobadas() => [
-        for (final excusa in _excusas.reversed)
-          if (excusa.aprobada && !excusa.oculta) excusa.publica(),
-      ];
+  /// Las excusas que escogió el jurado: lo que responde `GET /excusas`.
+  List<Map<String, Object?>> excusasElegidas() =>
+      _excusas.fase == Fase.lista ? _excusas.elegidas : const [];
 
   void _publico(Conexion conexion, Map<String, Object?> json) {
     final tipo = json['t'];
@@ -203,20 +246,10 @@ class Sala {
       final id = json['id'];
       if (id is! String || !_idValido.hasMatch(id)) return;
       conexion.cliente = id;
-      final persona = _personas.putIfAbsent(
-        id,
-        () => personas[_azar.nextInt(personas.length)],
-      );
-      conexion.enviar(
-        jsonEncode({
-          't': 'yo',
-          ...persona.toJson(),
-          'votos': {
-            for (final MapEntry(:key, :value) in _votos.entries)
-              if (value[id] case final elegidas?) key: elegidas,
-          },
-        }),
-      );
+      final asistente = _asistentes.putIfAbsent(id, _nuevoAsistente);
+      // Si el servidor se reinició, el celular trae el nombre guardado.
+      if (asistente.nombre == null) _bautizar(asistente, json['nombre']);
+      _presentarse(conexion, asistente);
       conexion.enviar(jsonEncode(_estadoPublico()));
       _cambio = true;
       return;
@@ -224,6 +257,13 @@ class Sala {
     final cliente = conexion.cliente;
     if (cliente == null) return;
     switch (tipo) {
+      case 'nombre':
+        final asistente = _asistentes[cliente]!;
+        if (_bautizar(asistente, json['nombre'])) {
+          _presentarse(conexion, asistente);
+        } else {
+          conexion.enviar('{"t":"nombre","ok":false}');
+        }
       case 'voto':
         _votar(cliente, json);
       case 'toque':
@@ -237,16 +277,13 @@ class Sala {
           _cambio = true;
         }
       case 'excusa':
-        if (modo != 'excuse') return;
+        final abierta = _excusas.fase == Fase.abierta &&
+            _reloj().isBefore(_excusas.cierre!);
+        if (!abierta) return;
         _escribir(_excusas, cliente, json['texto'], maximo: 140, porPersona: 3);
       case 'pregunta':
         _escribir(_preguntas, cliente, json['texto'],
             maximo: 200, porPersona: 5);
-      case 'apoyo':
-        final pregunta = _buscar(_preguntas, json['id']);
-        if (pregunta != null && pregunta.aprobada && !pregunta.oculta) {
-          _cambio = pregunta.apoyos.add(cliente) || _cambio;
-        }
       case 'reaccion':
         final reaccion = json['r'];
         if (reaccion is String &&
@@ -264,6 +301,53 @@ class Sala {
           _cambio = true;
         }
     }
+  }
+
+  /// El widget menos repetido hasta ahora, para que haya variedad de apodos.
+  Asistente _nuevoAsistente() {
+    final usos = {for (final persona in personas) persona.widget: 0};
+    for (final asistente in _asistentes.values) {
+      usos[asistente.persona.widget] = usos[asistente.persona.widget]! + 1;
+    }
+    final menos = usos.values.reduce(math.min);
+    final libres = [
+      for (final persona in personas)
+        if (usos[persona.widget] == menos) persona,
+    ];
+    return Asistente(libres[_azar.nextInt(libres.length)]);
+  }
+
+  /// Guarda el nombre si sirve. La primera vez, avisa en la terminal.
+  bool _bautizar(Asistente asistente, Object? valor) {
+    final nombre = nombreValido(valor);
+    if (nombre == null) return false;
+    final primeraVez = asistente.nombre == null;
+    asistente.nombre = nombre;
+    if (primeraVez) {
+      _llegadas.add({
+        'n': ++_llegada,
+        'nombre': nombre,
+        'widget': asistente.persona.widget,
+      });
+      if (_llegadas.length > 40) _llegadas.removeAt(0);
+    }
+    _cambio = true;
+    return true;
+  }
+
+  void _presentarse(Conexion conexion, Asistente asistente) {
+    final id = conexion.cliente!;
+    conexion.enviar(
+      jsonEncode({
+        't': 'yo',
+        ...asistente.persona.toJson(),
+        'nombre': asistente.nombre,
+        'votos': {
+          for (final MapEntry(:key, :value) in _votos.entries)
+            if (value[id] case final elegidas?) key: elegidas,
+        },
+      }),
+    );
   }
 
   void _votar(String cliente, Map<String, Object?> json) {
@@ -286,32 +370,84 @@ class Sala {
   }
 
   void _escribir(
-    List<Texto> lista,
+    RondaDeTextos ronda,
     String cliente,
     Object? valor, {
     required int maximo,
     required int porPersona,
   }) {
-    final texto = _limpio(valor, maximo: maximo);
+    final texto = limpio(valor, maximo: maximo);
     if (texto == null) return;
+    final lista = ronda.textos;
     if (lista.where((t) => t.cliente == cliente).length >= porPersona) return;
     lista.add(
       Texto(
-        id: '${_siguiente++}',
+        id: _siguiente++,
         texto: texto,
-        autor: _personas[cliente]?.widget ?? 'Widget',
+        apodo: _asistentes[cliente]?.persona.widget ?? 'Widget',
         cliente: cliente,
       ),
     );
     _cambio = true;
   }
 
-  void _comando(Map<String, Object?> json) {
+  /// Cierra la ronda y le pide al jurado los textos para la pantalla. Si
+  /// no hay jurado o falla, escoge el plan B. Las excusas nunca quedan en
+  /// menos de cuatro: se completan con las de respaldo.
+  Future<void> _elegir(RondaDeTextos ronda) async {
+    if (ronda.fase == Fase.eligiendo) return;
+    final generacion = ++ronda.generacion;
+    ronda
+      ..fase = Fase.eligiendo
+      ..cierre = null;
+    _cambio = true;
+    final textos = [
+      for (final texto in ronda.textos)
+        if (!esGrosero(texto.texto)) texto,
+    ];
+    final escritos = [
+      for (final texto in textos.take(300))
+        (id: '${texto.id}', texto: texto.texto),
+    ];
+    var ids = <String>[];
+    var porIA = false;
+    if (escritos.isNotEmpty) {
+      final jurado = _jurado;
+      if (jurado != null) {
+        try {
+          ids = await jurado.elegir(ronda.ronda, escritos);
+          porIA = true;
+        } on Object catch (error) {
+          stdout.writeln('El jurado falló (${ronda.ronda.name}): $error');
+        }
+      }
+      if (!porIA) ids = elegirSinIA(ronda.ronda, escritos, _azar);
+    }
+    if (generacion != ronda.generacion) return;
+    final porId = {for (final texto in textos) '${texto.id}': texto};
+    final elegidas = <Map<String, Object?>>[
+      for (final id in ids.toSet())
+        if (porId[id] case final texto?) texto.toJson(),
+    ].take(5).toList();
+    if (ronda.ronda == Ronda.excusas && elegidas.length < 4) {
+      elegidas
+        ..addAll(respaldo(4 - elegidas.length, _azar))
+        ..shuffle(_azar);
+    }
+    ronda
+      ..elegidas = elegidas
+      ..porIA = porIA
+      ..fase = Fase.lista;
+    _cambio = true;
+  }
+
+  void _comando(Conexion conexion, Map<String, Object?> json) {
     switch (json['t']) {
       case 'cue':
         final cue = json['cue'];
-        if (cue is! Map<String, Object?> || !_modos.contains(cue['mode']))
+        if (cue is! Map<String, Object?> || !_modos.contains(cue['mode'])) {
           return;
+        }
         final poll = cue['poll'];
         if (poll is Map<String, Object?> && poll['id'] is String) {
           final id = poll['id']! as String;
@@ -323,21 +459,25 @@ class Sala {
           _multiple[id] = poll['multiple'] == true;
         }
         _cue = cue;
+        _rondas(cue);
         _cambio = true;
-      case 'aprobar' || 'ocultar':
-        final lista = json['tipo'] == 'pregunta' ? _preguntas : _excusas;
-        final texto = _buscar(lista, json['id']);
-        if (texto == null) return;
-        final aprobar = json['t'] == 'aprobar';
-        texto
-          ..aprobada = aprobar
-          ..oculta = !aprobar;
+      case 'quitar':
+        // Por si el jurado deja pasar algo que no debe salir en pantalla.
+        final ronda = json['tipo'] == 'pregunta' ? _preguntas : _excusas;
+        ronda.elegidas = [
+          for (final elegida in ronda.elegidas)
+            if (elegida['id'] != json['id']) elegida,
+        ];
         _cambio = true;
-      case 'respondida':
-        final pregunta = _buscar(_preguntas, json['id']);
-        if (pregunta == null) return;
-        pregunta.respondida = !pregunta.respondida;
-        _cambio = true;
+      case 'asistentes':
+        conexion.enviar(jsonEncode({
+          't': 'asistentes',
+          'lista': [
+            for (final asistente in _asistentes.values)
+              if (asistente.nombre case final nombre?)
+                {'nombre': nombre, 'widget': asistente.persona.widget},
+          ],
+        }));
       case 'diapositiva':
         _diapositiva = {
           for (final clave in const [
@@ -364,19 +504,47 @@ class Sala {
           }
         }
       case 'reiniciar':
-        if (json['que'] == 'contador') _contador = 0;
-        if (json['que'] == 'votos' && json['poll'] is String) {
-          _votos.remove(json['poll']);
+        switch (json['que']) {
+          case 'contador':
+            _contador = 0;
+          case 'votos' when json['poll'] is String:
+            _votos.remove(json['poll']);
+          case 'excusas':
+            _reiniciar(_excusas);
+          case 'preguntas':
+            _reiniciar(_preguntas);
         }
         _cambio = true;
     }
   }
 
-  Texto? _buscar(List<Texto> lista, Object? id) {
-    for (final texto in lista) {
-      if (texto.id == id) return texto;
+  /// Lo que cada pantalla le pide a las rondas: las excusas se abren con
+  /// un tiempo y se cierran al pasar de paso; las preguntas se eligen al
+  /// llegar a su diapositiva.
+  void _rondas(Map<String, Object?> cue) {
+    switch (cue['mode']) {
+      case 'excuse' when cue['open'] == true:
+        if (_excusas.fase == Fase.cerrada) {
+          final segundos = cue['seconds'];
+          _excusas
+            ..fase = Fase.abierta
+            ..cierre = _reloj().add(
+              Duration(seconds: segundos is int ? segundos.clamp(5, 300) : 60),
+            );
+        }
+      case 'excuse':
+        if (_excusas.fase == Fase.abierta) unawaited(_elegir(_excusas));
+      case 'questions':
+        if (_preguntas.fase == Fase.cerrada) unawaited(_elegir(_preguntas));
     }
-    return null;
+  }
+
+  void _reiniciar(RondaDeTextos ronda) {
+    ronda
+      ..generacion += 1
+      ..fase = Fase.cerrada
+      ..cierre = null
+      ..elegidas = const [];
   }
 
   Map<String, Object?> _resultados(String poll) {
@@ -404,11 +572,26 @@ class Sala {
     };
   }
 
-  List<Map<String, Object?>> _preguntasVisibles() {
-    final visibles = _preguntas.where((p) => p.aprobada && !p.oculta).toList()
-      ..sort((a, b) => b.apoyos.length.compareTo(a.apoyos.length));
-    return [for (final pregunta in visibles.take(30)) pregunta.publica()];
+  /// Cuánto le queda a la ronda abierta, en segundos.
+  double _restante(RondaDeTextos ronda) {
+    final cierre = ronda.cierre;
+    if (ronda.fase != Fase.abierta || cierre == null) return 0;
+    final ms = cierre.difference(_reloj()).inMilliseconds;
+    return math.max(0, ms / 1000);
   }
+
+  Map<String, Object?> _ronda(RondaDeTextos ronda, {bool completa = false}) => {
+        'phase': ronda.fase.name,
+        'remaining': _restante(ronda),
+        if (completa) ...{
+          'received': ronda.textos.length,
+          'byAi': ronda.porIA,
+          'picks': ronda.fase == Fase.lista ? ronda.elegidas : const [],
+        },
+      };
+
+  int get _conNombre =>
+      _asistentes.values.where((asistente) => asistente.nombre != null).length;
 
   Map<String, Object?> _estadoPublico() {
     final poll = _cue['poll'];
@@ -419,8 +602,7 @@ class Sala {
       'connected': conectados,
       'counter': _contador,
       if (id is String) 'results': _resultados(id),
-      'excuses': excusasAprobadas().take(12).toList(),
-      'questions': _preguntasVisibles(),
+      'excuseRound': _ronda(_excusas),
       'rating': _estrellasResumen(),
     };
   }
@@ -429,23 +611,14 @@ class Sala {
         't': 'estado',
         'cue': _cue,
         'connected': conectados,
+        'people': _conNombre,
+        'joins': _llegadas,
         'counter': _contador,
         'polls': {for (final id in _votos.keys) id: _resultados(id)},
-        'excuses': [for (final excusa in _excusas) excusa.completa()],
-        'questions': [for (final pregunta in _preguntas) pregunta.completa()],
+        'excuseRound': _ronda(_excusas, completa: true),
+        'questionRound': _ronda(_preguntas, completa: true),
         'rating': _estrellasResumen(distribucion: true),
         'reactions': reacciones,
         'slide': _diapositiva,
       };
-}
-
-/// Una línea sin caracteres de control ni espacios de más, recortada.
-String? _limpio(Object? valor, {required int maximo}) {
-  if (valor is! String) return null;
-  final texto = valor
-      .replaceAll(RegExp(r'[\u0000-\u001F\u007F]'), ' ')
-      .replaceAll(RegExp(r'\s+'), ' ')
-      .trim();
-  if (texto.length < 3) return null;
-  return texto.length > maximo ? texto.substring(0, maximo) : texto;
 }

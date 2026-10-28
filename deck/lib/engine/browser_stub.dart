@@ -33,6 +33,9 @@ class _NoBrowser implements Browser {
   void openWindow(String url, String name) {}
 
   @override
+  Future<bool> showDemoApps() async => false;
+
+  @override
   MessageChannel channel(String name) => _NoChannel();
 }
 

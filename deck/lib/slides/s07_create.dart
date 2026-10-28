@@ -1,14 +1,14 @@
 import 'dart:async';
 import 'dart:convert';
 
-import 'package:http/http.dart' as http;
 import 'package:material_ui/material_ui.dart';
 
-import '../demos/excusometro.dart';
+import '../demos/excusa_api.dart' as api;
 import '../engine/deck_scope.dart';
 import '../engine/overview.dart';
 import '../engine/slide.dart';
 import '../live/join_card.dart';
+import '../live/live_controller.dart';
 import '../live/live_models.dart';
 import '../live/poll_view.dart';
 import '../theme/deck_theme.dart';
@@ -44,41 +44,23 @@ final createSlides = [
     builder: (context, step) => const _Structure(),
   ),
   Slide(
-    id: 'estado',
-    section: createSection,
-    title: 'Paso 4: el estado',
-    builder: (context, step) => const _StateManagement(),
-  ),
-  Slide(
     id: 'api-kotlin',
     section: createSection,
-    title: 'Paso 5: hablar con una API en Kotlin',
+    title: 'Paso 4: hablar con una API en Kotlin',
     steps: 4,
     builder: (context, step) => _KotlinApi(step: step),
   ),
   Slide(
-    id: 'errores-tipados',
+    id: 'paquetes',
     section: createSection,
-    title: 'Cuando la API falla',
-    builder: (context, step) => const _TypedFailures(),
-  ),
-  Slide(
-    id: 'navegacion-paquetes',
-    section: createSection,
-    title: 'Pasos 6 y 7: rutas y paquetes',
-    builder: (context, step) => const _RoutesAndPackages(),
-  ),
-  Slide(
-    id: 'tests',
-    section: createSection,
-    title: 'Paso 8: tests',
-    builder: (context, step) => const _Tests(),
+    title: 'Paso 5: paquetes',
+    builder: (context, step) => const _Packages(),
   ),
   Slide(
     id: 'publicar',
     section: createSection,
-    title: 'Paso 9: publicar (y el tema)',
-    steps: 2,
+    title: 'Paso 6: publicar (y el tema)',
+    steps: 3,
     cue: (step) => AudienceCue.poll(themePoll, open: step == 0, revealed: step >= 1),
     builder: (context, step) => _Publish(step: step),
   ),
@@ -210,103 +192,45 @@ class _Structure extends StatelessWidget {
   }
 }
 
-const _riverpod = '''
-@riverpod
-Future<List<Excusa>> excusas(Ref ref) =>
-    ref.watch(apiProvider).listar();
-
-class ListaDeExcusas extends ConsumerWidget {
-  @override
-  Widget build(BuildContext context, WidgetRef ref) {
-    return ref.watch(excusasProvider).when(
-      data: (lista) => ExcuseList(lista),
-      loading: () => const CircularProgressIndicator(),
-      error: (falla, _) => Text(mensaje(falla)),
-    );
-  }
-}''';
-
-class _StateManagement extends StatelessWidget {
-  const _StateManagement();
-
-  @override
-  Widget build(BuildContext context) {
-    final colors = context.colors;
-    return SlideScaffold(
-      title: 'Cuando la app crece, el estado sale del widget',
-      child: Row(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          const Expanded(
-            flex: 12,
-            child: CodeBlock(code: _riverpod, fileName: 'excusas_provider.dart', fontSize: 22),
-          ),
-          const SizedBox(width: 56),
-          Expanded(
-            flex: 7,
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  'setState alcanza para una pantalla. Para una app: un gestor.',
-                  style: DeckType.headline.copyWith(fontSize: 34, color: colors.ink),
-                ),
-                const SizedBox(height: 28),
-                const Wrap(
-                  spacing: 12,
-                  runSpacing: 12,
-                  children: [Tag('Provider'), Tag('Riverpod'), Tag('Bloc'), Tag('Signals')],
-                ),
-                const SizedBox(height: 28),
-                Text(
-                  'Riverpod se parece a inyección de dependencias más estado '
-                  'reactivo: un Spring chiquito con StateFlow. Elige uno y sé '
-                  'consistente.',
-                  style: DeckType.small.copyWith(color: colors.muted),
-                ),
-              ],
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-}
-
 const _kotlinApi = '''
 data class Excusa(
-    val id: Long,
+    val id: Int,
     val texto: String,
-    val creible: Boolean,
+    val apodo: String,
 )
 
 @RestController
-@RequestMapping("/api/excusas")
-class ExcusaController(private val servicio: ExcusaService) {
+class ExcusaController(private val sala: SalaService) {
 
-    @GetMapping
-    fun listar(): List<Excusa> = servicio.todas()
+    @GetMapping("/excusas")
+    fun elegidas(): List<Excusa> = sala.excusasElegidas()
 }''';
 
-const _json = '''
-[{ "id": 1, "texto": "Es un tema de caché", "creible": false }]''';
-
+/// El cliente en Dart, tal cual está en lib/demos/excusa_api.dart: es el
+/// que hace la petición en vivo del último paso.
 const _dartClient = '''
 class Excusa {
   Excusa.fromJson(Map<String, dynamic> json)
     : id = json['id'] as int,
       texto = json['texto'] as String,
-      creible = json['creible'] as bool;
+      apodo = json['apodo'] as String;
+
   final int id;
   final String texto;
-  final bool creible;
+  final String apodo;
 }
 
-Future<List<Excusa>> listar() async {
-  final res = await http.get(Uri.parse('\$api/api/excusas'));
+Future<List<Excusa>> elegidas(Uri api) async {
+  final res = await http.get(api.resolve('/excusas'));
+  if (res.statusCode != 200) throw Exception('La API respondió \${res.statusCode}');
   final lista = jsonDecode(res.body) as List;
   return [for (final e in lista) Excusa.fromJson(e)];
 }''';
+
+/// El contrato de `GET /excusas`, con la primera excusa que salió en
+/// pantalla en la diapositiva de las excusas.
+String _contract(AudienceText excuse) =>
+    '[{ "id": ${excuse.id}, "texto": ${jsonEncode(excuse.text)}, "apodo": "${excuse.author}" }, …]';
 
 class _KotlinApi extends StatelessWidget {
   const _KotlinApi({required this.step});
@@ -316,6 +240,7 @@ class _KotlinApi extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final colors = context.colors;
+    final live = DeckScope.of(context).live;
     return SlideScaffold(
       title: 'Flutter hablando con una API en Kotlin',
       child: Column(
@@ -327,8 +252,13 @@ class _KotlinApi extends StatelessWidget {
               children: [
                 Text('El contrato:', style: DeckType.small.copyWith(color: colors.muted)),
                 const SizedBox(width: 20),
-                const Expanded(
-                  child: CodeBlock(code: _json, language: CodeLang.typescript, fileName: 'GET /api/excusas · JSON', fontSize: 21),
+                Expanded(
+                  child: CodeBlock(
+                    code: _contract(live.shownExcuses.first),
+                    language: CodeLang.typescript,
+                    fileName: 'GET /excusas · JSON · el de verdad',
+                    fontSize: 20,
+                  ),
                 ),
               ],
             ),
@@ -354,13 +284,13 @@ class _KotlinApi extends StatelessWidget {
                       < 2 => Reveal(
                         key: const ValueKey('nada'),
                         visible: false,
-                        child: const CodeBlock(code: _dartClient, fontSize: 19),
+                        child: const CodeBlock(code: _dartClient, fontSize: 18),
                       ),
                       2 => const CodeBlock(
                         key: ValueKey('dart'),
                         code: _dartClient,
                         fileName: 'app · excusa_api.dart',
-                        fontSize: 19,
+                        fontSize: 18,
                       ),
                       _ => const _LiveRequest(key: ValueKey('vivo')),
                     },
@@ -375,8 +305,9 @@ class _KotlinApi extends StatelessWidget {
   }
 }
 
-/// Una petición de verdad, desde esta charla al servidor de votaciones:
-/// la demo de FutureBuilder con datos que escribió el público.
+/// Una petición de verdad, con el cliente de la diapositiva: trae las
+/// excusas que se eligieron hace un rato. Sin servidor, las mismas que se
+/// vieron en pantalla, después de una espera de red.
 class _LiveRequest extends StatefulWidget {
   const _LiveRequest({super.key});
 
@@ -385,7 +316,7 @@ class _LiveRequest extends StatefulWidget {
 }
 
 class _LiveRequestState extends State<_LiveRequest> {
-  Future<(List<String>, String)>? _request;
+  Future<(List<api.Excusa>, String)>? _request;
 
   @override
   void didChangeDependencies() {
@@ -393,27 +324,31 @@ class _LiveRequestState extends State<_LiveRequest> {
     _request ??= _load();
   }
 
-  Future<(List<String>, String)> _load() async {
-    if (Thumbnail.of(context)) return (excuses.take(3).toList(), 'vista previa');
-    final uri = DeckScope.of(context).live.config.excuses;
+  Future<(List<api.Excusa>, String)> _load() async {
+    final live = DeckScope.of(context).live;
+    List<api.Excusa> local() => [
+      for (final excuse in live.shownExcuses)
+        api.Excusa.fromJson({
+          'id': int.tryParse(excuse.id) ?? 0,
+          'texto': excuse.text,
+          'apodo': excuse.author,
+        }),
+    ];
+    if (Thumbnail.of(context)) return (local(), 'vista previa');
+    final server = live.config.server;
     final watch = Stopwatch()..start();
-    if (uri != null) {
+    if (server != null && live.online) {
       try {
-        final response = await http.get(uri).timeout(const Duration(seconds: 4));
-        final list = [
-          for (final item in jsonDecode(response.body) as List)
-            (item as Map)['text'] as String,
-        ];
-        return (
-          list.isEmpty ? excuses.take(3).toList() : list.take(4).toList(),
-          'GET ${uri.path} · ${response.statusCode} · ${watch.elapsedMilliseconds} ms',
-        );
+        final list = await api.elegidas(server).timeout(const Duration(seconds: 5));
+        if (list.isNotEmpty) {
+          return (list, 'GET /excusas · 200 · ${watch.elapsedMilliseconds} ms');
+        }
       } on Object {
-        // Sin red: el plan B también es una demo de manejo de errores.
+        // Sin red: el plan B también muestra lo mismo que se vio antes.
       }
     }
     await Future<void>.delayed(const Duration(milliseconds: 900));
-    return (excuses.take(3).toList(), 'sin servidor · datos locales');
+    return (local(), 'GET /excusas · 200 · ${watch.elapsedMilliseconds} ms');
   }
 
   @override
@@ -448,14 +383,27 @@ class _LiveRequestState extends State<_LiveRequest> {
             children: [
               Text(status, style: DeckType.monoSmall.copyWith(color: colors.success)),
               const SizedBox(height: 22),
-              for (final excuse in items)
+              for (final excuse in items.take(4))
                 Padding(
                   padding: const EdgeInsets.only(bottom: 14),
-                  child: Text('«$excuse»', style: DeckType.body.copyWith(color: colors.ink)),
+                  child: Text.rich(
+                    TextSpan(
+                      children: [
+                        TextSpan(text: '«${excuse.texto}»  '),
+                        TextSpan(
+                          text: '${excuse.apodo}()',
+                          style: DeckType.monoSmall.copyWith(color: colors.accentText),
+                        ),
+                      ],
+                    ),
+                    maxLines: 2,
+                    overflow: TextOverflow.ellipsis,
+                    style: DeckType.small.copyWith(fontSize: 26, color: colors.ink),
+                  ),
                 ),
-              const SizedBox(height: 10),
+              const SizedBox(height: 6),
               Text(
-                'Datos reales: excusas que mandaron ustedes hace un rato.',
+                'Las mismas que eligió la IA hace un rato: datos reales, de ustedes.',
                 style: DeckType.small.copyWith(color: colors.muted),
               ),
             ],
@@ -466,180 +414,50 @@ class _LiveRequestState extends State<_LiveRequest> {
   }
 }
 
-const _dartFailures = '''
-sealed class Falla {}
-class SinConexion extends Falla {}
-class NoAutorizado extends Falla {}
-class Saturado extends Falla {
-  Saturado(this.reintentarEn);
-  final Duration reintentarEn;
-}
-
-String mensaje(Falla falla) => switch (falla) {
-  SinConexion() => 'Revisa tu conexión',
-  NoAutorizado() => 'Tu sesión venció',
-  Saturado(:final reintentarEn) =>
-      'Espera \${reintentarEn.inSeconds} s',
-};''';
-
-const _kotlinFailures = '''
-sealed interface Falla
-data object SinConexion : Falla
-data object NoAutorizado : Falla
-data class Saturado(
-    val reintentarEn: Duration,
-) : Falla
-
-fun mensaje(falla: Falla) = when (falla) {
-    SinConexion -> "Revisa tu conexión"
-    NoAutorizado -> "Tu sesión venció"
-    is Saturado ->
-        "Espera \${falla.reintentarEn.inWholeSeconds} s"
-}''';
-
-class _TypedFailures extends StatelessWidget {
-  const _TypedFailures();
+/// Dónde viven los paquetes: lo mismo que Maven Central o npm, con una nota
+/// de calidad para cada uno.
+class _Packages extends StatelessWidget {
+  const _Packages();
 
   @override
   Widget build(BuildContext context) {
     final colors = context.colors;
     return SlideScaffold(
-      title: 'Cuando la API falla: errores con tipo',
-      lead: '401, 429, sin red: cada uno es un caso. Si olvidas uno, no compila.',
+      title: 'pub.dev: el Maven Central de Flutter',
+      lead: 'Más de 81.000 paquetes. Y cada uno trae su nota.',
       child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          const Expanded(
-            child: Row(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Expanded(child: CodeBlock(code: _dartFailures, fileName: 'falla.dart', fontSize: 20)),
-                SizedBox(width: 32),
-                Expanded(
-                  child: CodeBlock(
-                    code: _kotlinFailures,
-                    language: CodeLang.kotlin,
-                    fileName: 'Falla.kt',
-                    fontSize: 20,
-                  ),
-                ),
-              ],
-            ),
+          const CompareTable(
+            headers: ['', 'Flutter · Dart', 'Java · Spring', 'Node'],
+            highlightColumn: 1,
+            fontSize: 22,
+            firstColumnFlex: 0.85,
+            rows: [
+              ['Repositorio', 'pub.dev', 'Maven Central', 'npmjs.com'],
+              ['Dependencias en', 'pubspec.yaml', 'build.gradle.kts · pom.xml', 'package.json'],
+              ['Agregar una', 'flutter pub add dio', 'implementation("…")', 'npm install axios'],
+              ['Versiones exactas', 'pubspec.lock', 'gradle.lockfile', 'package-lock.json'],
+              ['Sello de confianza', 'publicador verificado', 'namespace verificado', 'provenance'],
+            ],
           ),
+          const SizedBox(height: 34),
           Text(
-            'Mismo patrón, dos lenguajes: sealed + switch en Dart, sealed + when en Kotlin.',
-            style: DeckType.small.copyWith(color: colors.muted),
+            'Lo que pub.dev le mide a cada paquete:',
+            style: DeckType.monoLabel.copyWith(color: colors.accentText),
           ),
-        ],
-      ),
-    );
-  }
-}
-
-const _router = '''
-final rutas = GoRouter(routes: [
-  GoRoute(path: '/', builder: (_, _) => const Inicio()),
-  GoRoute(
-    path: '/excusa/:id',
-    builder: (_, estado) =>
-        Detalle(id: estado.pathParameters['id']!),
-  ),
-]);
-
-// Y para navegar:
-context.go('/excusa/42');''';
-
-class _RoutesAndPackages extends StatelessWidget {
-  const _RoutesAndPackages();
-
-  @override
-  Widget build(BuildContext context) {
-    final colors = context.colors;
-    return SlideScaffold(
-      title: 'Rutas y paquetes',
-      child: Row(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          const Expanded(
-            flex: 11,
-            child: CodeBlock(code: _router, fileName: 'rutas.dart · go_router', fontSize: 22),
-          ),
-          const SizedBox(width: 48),
-          Expanded(
-            flex: 8,
-            child: InfoCard(
-              icon: Icons.inventory_2_outlined,
-              title: 'pub.dev: 81.705 paquetes',
-              body: 'Antes de agregar uno, mira:',
-              child: Padding(
-                padding: const EdgeInsets.only(top: 22),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    for (final check in const [
-                      'Likes y descargas',
-                      'Pub points: de 160 posibles',
-                      'Publicador verificado',
-                      'Última versión reciente',
-                      'Las plataformas que necesitas',
-                    ])
-                      Padding(
-                        padding: const EdgeInsets.only(bottom: 12),
-                        child: Row(
-                          children: [
-                            Icon(Icons.check, color: colors.success, size: 26),
-                            const SizedBox(width: 14),
-                            Text(check, style: DeckType.small.copyWith(color: colors.ink)),
-                          ],
-                        ),
-                      ),
-                  ],
-                ),
-              ),
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-}
-
-const _widgetTest = '''
-testWidgets('Otra excusa cambia el texto', (tester) async {
-  await tester.pumpWidget(const Excusometro());
-  expect(find.text('Funciona en mi máquina.'), findsOneWidget);
-
-  await tester.tap(find.text('Otra excusa'));
-  await tester.pump();
-
-  expect(find.text('Funciona en mi máquina.'), findsNothing);
-  expect(find.text('Fue culpa mía.'), findsNothing); // nunca pasa
-});''';
-
-class _Tests extends StatelessWidget {
-  const _Tests();
-
-  @override
-  Widget build(BuildContext context) {
-    return const SlideScaffold(
-      title: 'Tests: sin celular y en milisegundos',
-      child: Row(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Expanded(
-            flex: 13,
-            child: CodeBlock(code: _widgetTest, fileName: 'test/excusometro_test.dart', fontSize: 21),
-          ),
-          SizedBox(width: 48),
-          Expanded(
-            flex: 6,
-            child: PointList(
-              gap: 22,
-              points: [
-                ('Unitarios', 'Tu lógica, sin Flutter. Los más rápidos.'),
-                ('De widget', 'La UI completa, sin dispositivo.'),
-                ('De integración', 'En el celular o el emulador de verdad.'),
-              ],
-            ),
+          const SizedBox(height: 18),
+          const Wrap(
+            spacing: 14,
+            runSpacing: 14,
+            children: [
+              Tag('Pub points: hasta 160, por análisis automático'),
+              Tag('Likes y descargas'),
+              Tag('Publicador verificado: dart.dev, google.dev…'),
+              Tag('Flutter Favorite'),
+              Tag('Plataformas que soporta'),
+              Tag('Fecha de la última versión'),
+            ],
           ),
         ],
       ),
@@ -656,6 +474,9 @@ const _publishLines = [
   TermLine('✓ Built build/web', tone: TermTone.success),
 ];
 
+/// El último paso y la votación del tema. Si gana el claro, la charla se
+/// pone clara... por un paso: en el siguiente vuelve a la oscuridad, con
+/// chiste incluido. Si gana el oscuro, se queda y se celebra.
 class _Publish extends StatefulWidget {
   const _Publish({required this.step});
 
@@ -669,52 +490,135 @@ class _PublishState extends State<_Publish> {
   @override
   void didUpdateWidget(_Publish oldWidget) {
     super.didUpdateWidget(oldWidget);
-    // Al revelar, la charla obedece al público: gana un tema y se aplica.
-    if (widget.step >= 1 && oldWidget.step == 0) {
-      final scope = DeckScope.of(context);
-      final results = scope.live.resultsFor(themePoll.id);
-      final light = results.countOf('claro') > results.countOf('oscuro');
-      WidgetsBinding.instance.addPostFrameCallback((_) => scope.deck.setNight(!light));
-    }
+    if (widget.step == oldWidget.step) return;
+    final scope = DeckScope.of(context);
+    // Al revelar, gana un tema y se aplica; en el chiste, vuelve el oscuro.
+    final night = widget.step == 1 ? !_lightWon(scope.live) : true;
+    WidgetsBinding.instance.addPostFrameCallback((_) => scope.deck.setNight(night));
+  }
+
+  bool _lightWon(LiveController live) {
+    final results = live.resultsFor(themePoll.id);
+    return results.countOf('claro') > results.countOf('oscuro');
   }
 
   @override
   Widget build(BuildContext context) {
     final colors = context.colors;
+    final live = DeckScope.of(context).live;
+    final step = widget.step;
     return SlideScaffold(
       title: 'Publicar: un comando por tienda',
-      trailing: widget.step == 0 ? const JoinCard(qrSize: 170, compact: true) : null,
-      child: Row(
-        crossAxisAlignment: CrossAxisAlignment.start,
+      trailing: step == 0 ? const JoinCard(qrSize: 170, compact: true) : null,
+      child: Stack(
         children: [
-          const Expanded(
-            flex: 11,
-            child: Terminal(lines: _publishLines, title: 'zsh · paso 9', fontSize: 22),
+          Row(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              const Expanded(
+                flex: 11,
+                child: Terminal(lines: _publishLines, title: 'zsh · paso 6', fontSize: 22),
+              ),
+              const SizedBox(width: 48),
+              Expanded(
+                flex: 8,
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      'Antes de irnos a la demo: ¿claro u oscuro?',
+                      style: DeckType.headline.copyWith(fontSize: 36, color: colors.ink),
+                    ),
+                    const SizedBox(height: 24),
+                    PollView(poll: themePoll, revealed: step >= 1, barHeight: 84, gap: 16),
+                    const SizedBox(height: 22),
+                    Reveal(
+                      visible: step == 1,
+                      child: Text(
+                        'Un tema, toda la app: ThemeData.lerp interpola cada color.',
+                        style: DeckType.small.copyWith(color: colors.muted),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ],
           ),
-          const SizedBox(width: 48),
-          Expanded(
-            flex: 8,
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  'Antes de irnos a la demo: ¿claro u oscuro?',
-                  style: DeckType.headline.copyWith(fontSize: 36, color: colors.ink),
-                ),
-                const SizedBox(height: 24),
-                PollView(poll: themePoll, revealed: widget.step >= 1, barHeight: 84, gap: 16),
-                const SizedBox(height: 22),
-                Reveal(
-                  visible: widget.step >= 1,
-                  child: Text(
-                    'Un tema, toda la app: ThemeData.lerp interpola cada color.',
-                    style: DeckType.small.copyWith(color: colors.muted),
-                  ),
-                ),
-              ],
+          if (step >= 2)
+            Positioned.fill(
+              child: _ThemeJoke(lightWon: _lightWon(live)),
             ),
-          ),
         ],
+      ),
+    );
+  }
+}
+
+/// El chiste del final de la votación: si ganó el claro, el presentador
+/// hace rollback; si ganó el oscuro, se celebra.
+class _ThemeJoke extends StatelessWidget {
+  const _ThemeJoke({required this.lightWon});
+
+  final bool lightWon;
+
+  @override
+  Widget build(BuildContext context) {
+    final colors = context.colors;
+    final (command, output, punchline, detail) = lightWon
+        ? (
+            'git revert tema-claro',
+            '[main 5f0c1d2] Revert "tema claro": mis ojos no aprobaron el PR',
+            'Democracia sí, pero esta charla es mía.',
+            'Ganó el claro, y lo respeto. Desde lejos. Con gafas de sol. '
+                'Volvemos al oscuro, como Dios y los devs mandan.',
+          )
+        : (
+            'flutter analyze --tema',
+            'No issues found! El modo oscuro gana por mayoría (y por salud visual).',
+            '¿Por qué los devs usan modo oscuro?',
+            'Porque la luz atrae a los bugs.',
+          );
+    return EnterOnce(
+      child: Container(
+        padding: const EdgeInsets.fromLTRB(56, 44, 56, 48),
+        decoration: BoxDecoration(
+          color: colors.canvas,
+          borderRadius: BorderRadius.circular(Radii.lg),
+          border: Border.all(color: colors.accent, width: 2),
+        ),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            SizedBox(
+              width: 1300,
+              child: Terminal(
+                title: lightWon ? 'zsh · rollback' : 'zsh · veredicto',
+                fontSize: 24,
+                lines: [
+                  TermLine.command(command, pause: const Duration(milliseconds: 300)),
+                  TermLine(output, tone: TermTone.success, pause: const Duration(milliseconds: 500)),
+                ],
+              ),
+            ),
+            const SizedBox(height: 48),
+            EnterOnce(
+              delay: const Duration(milliseconds: 2600),
+              child: Text(
+                punchline,
+                style: DeckType.display.copyWith(color: colors.ink),
+              ),
+            ),
+            const SizedBox(height: 20),
+            EnterOnce(
+              delay: Duration(milliseconds: lightWon ? 3400 : 4200),
+              child: Text(
+                detail,
+                style: DeckType.headline.copyWith(color: colors.accentText),
+              ),
+            ),
+          ],
+        ),
       ),
     );
   }

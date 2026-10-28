@@ -421,87 +421,240 @@ class _Timeline extends StatelessWidget {
   }
 }
 
-class _BuiltWithFlutter extends StatelessWidget {
+class _BuiltWithFlutter extends StatefulWidget {
   const _BuiltWithFlutter({required this.step});
 
   final int step;
 
   @override
+  State<_BuiltWithFlutter> createState() => _BuiltWithFlutterState();
+}
+
+class _BuiltWithFlutterState extends State<_BuiltWithFlutter> {
+  final _stack = GlobalKey();
+  final _slot = GlobalKey();
+
+  /// Dónde está la tarjeta de «Esta presentación» dentro de la diapositiva:
+  /// de ahí sale para ir al centro.
+  Rect? _slotRect;
+
+  @override
+  void initState() {
+    super.initState();
+    WidgetsBinding.instance.addPostFrameCallback((_) => _measure());
+  }
+
+  @override
+  void didUpdateWidget(_BuiltWithFlutter oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    WidgetsBinding.instance.addPostFrameCallback((_) => _measure());
+  }
+
+  void _measure() {
+    if (!mounted) return;
+    final stack = _stack.currentContext?.findRenderObject() as RenderBox?;
+    final slot = _slot.currentContext?.findRenderObject() as RenderBox?;
+    if (stack == null || slot == null || !slot.hasSize) return;
+    final rect = slot.localToGlobal(Offset.zero, ancestor: stack) & slot.size;
+    if (rect != _slotRect) setState(() => _slotRect = rect);
+  }
+
+  @override
   Widget build(BuildContext context) {
     final colors = context.colors;
     final live = DeckScope.of(context).live;
+    final step = widget.step;
     const poll = builtWithFlutterPoll;
-    return SlideScaffold(
-      title: '¿Cuáles están hechas con Flutter?',
-      lead: 'Marca todas las que creas. Sin googlear.',
-      trailing: AnimatedOpacity(
-        opacity: step == 0 ? 1 : 0.35,
-        duration: Motion.base,
-        child: const JoinCard(qrSize: 170, compact: true),
-      ),
-      child: ListenableBuilder(
-        listenable: live,
-        builder: (context, _) {
-          final results = live.resultsFor(poll.id);
-          final manual = !live.online && !live.simulating;
-          return Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Expanded(
-                // Las dos filas caben siempre, haya o no QR en el encabezado.
-                child: LayoutBuilder(
-                  builder: (context, constraints) {
-                    const columns = 4;
-                    const gap = 24.0;
-                    final width = (constraints.maxWidth - gap * (columns - 1)) / columns;
-                    final height = (constraints.maxHeight - gap) / 2;
-                    return GridView.count(
-                      crossAxisCount: columns,
-                      mainAxisSpacing: gap,
-                      crossAxisSpacing: gap,
-                      childAspectRatio: width / height,
-                      physics: const NeverScrollableScrollPhysics(),
-                      children: [
-                        for (final (index, option) in poll.options.indexed)
-                          QuizCard(
-                            index: index,
-                            option: option,
-                            brand: _brands[option.id]!,
-                            share: results.shareOf(option.id),
-                            votes: results.countOf(option.id),
-                            // La trampa se voltea de última, sola.
-                            revealed: option.id == 'esta' ? step >= 2 : step >= 1,
-                            spotlight: step >= 2 && option.id == 'esta',
-                            dimmed: step >= 2 && option.id != 'esta',
-                          ),
-                      ],
-                    );
-                  },
-                ),
-              ),
-              const SizedBox(height: 18),
-              SizedBox(
-                height: 44,
-                child: AnimatedSwitcher(
-                  duration: Motion.base,
-                  child: Text(
-                    switch (step) {
-                      0 when manual => 'Mano alzada: teclas 1–8 suman votos',
-                      0 => '${results.voters} personas ya votaron',
-                      1 => 'Cuatro de siete. ¿Y la octava?',
-                      _ => 'Estás viendo una app de Flutter. Oprime X y mírale los huesos.',
-                    },
-                    key: ValueKey(step),
-                    style: DeckType.small.copyWith(
-                      color: step >= 2 ? colors.accentText : colors.muted,
+    final trap = poll.options.last;
+    return Stack(
+      key: _stack,
+      fit: StackFit.expand,
+      children: [
+        SlideScaffold(
+          title: '¿Cuáles están hechas con Flutter?',
+          lead: 'Marca todas las que creas. Sin googlear.',
+          trailing: AnimatedOpacity(
+            opacity: step == 0 ? 1 : 0.35,
+            duration: Motion.base,
+            child: const JoinCard(qrSize: 170, compact: true),
+          ),
+          child: ListenableBuilder(
+            listenable: live,
+            builder: (context, _) {
+              final results = live.resultsFor(poll.id);
+              final manual = !live.online && !live.simulating;
+              return Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Expanded(
+                    // Las dos filas caben siempre, haya o no QR en el encabezado.
+                    child: LayoutBuilder(
+                      builder: (context, constraints) {
+                        const columns = 4;
+                        const gap = 24.0;
+                        final width = (constraints.maxWidth - gap * (columns - 1)) / columns;
+                        final height = (constraints.maxHeight - gap) / 2;
+                        return GridView.count(
+                          crossAxisCount: columns,
+                          mainAxisSpacing: gap,
+                          crossAxisSpacing: gap,
+                          childAspectRatio: width / height,
+                          physics: const NeverScrollableScrollPhysics(),
+                          children: [
+                            for (final (index, option) in poll.options.indexed)
+                              if (option == trap)
+                                // La trampa no se voltea aquí: se va al centro.
+                                AnimatedOpacity(
+                                  key: _slot,
+                                  opacity: step >= 2 ? 0 : 1,
+                                  duration: Motion.quick,
+                                  child: QuizCard(
+                                    index: index,
+                                    option: option,
+                                    brand: _brands[option.id]!,
+                                    share: results.shareOf(option.id),
+                                    votes: results.countOf(option.id),
+                                    revealed: false,
+                                    spotlight: false,
+                                    dimmed: false,
+                                  ),
+                                )
+                              else
+                                QuizCard(
+                                  index: index,
+                                  option: option,
+                                  brand: _brands[option.id]!,
+                                  share: results.shareOf(option.id),
+                                  votes: results.countOf(option.id),
+                                  revealed: step >= 1,
+                                  spotlight: false,
+                                  dimmed: step >= 2,
+                                ),
+                          ],
+                        );
+                      },
+                    ),
+                  ),
+                  const SizedBox(height: 18),
+                  SizedBox(
+                    height: 44,
+                    child: AnimatedSwitcher(
+                      duration: Motion.base,
+                      child: Text(
+                        switch (step) {
+                          0 when manual => 'Mano alzada: teclas 1–8 suman votos',
+                          0 => '${results.voters} personas ya votaron',
+                          1 => 'Cuatro de siete. ¿Y la octava?',
+                          _ => 'Estás viendo una app de Flutter. Oprime X y mírale los huesos.',
+                        },
+                        key: ValueKey(step),
+                        style: DeckType.small.copyWith(
+                          color: step >= 2 ? colors.accentText : colors.muted,
+                        ),
+                      ),
+                    ),
+                  ),
+                ],
+              );
+            },
+          ),
+        ),
+        if (_slotRect case final slot?)
+          ListenableBuilder(
+            listenable: live,
+            builder: (context, _) => _Spotlight(
+              slot: slot,
+              active: step >= 2,
+              option: trap,
+              brand: _brands[trap.id]!,
+              share: live.resultsFor(poll.id).shareOf(trap.id),
+              votes: live.resultsFor(poll.id).countOf(trap.id),
+            ),
+          ),
+      ],
+    );
+  }
+}
+
+/// La tarjeta de «Esta presentación» sale de su lugar, crece en el centro
+/// de la pantalla y ahí se voltea, para que se lea desde la última fila.
+class _Spotlight extends StatelessWidget {
+  const _Spotlight({
+    required this.slot,
+    required this.active,
+    required this.option,
+    required this.brand,
+    required this.share,
+    required this.votes,
+  });
+
+  final Rect slot;
+  final bool active;
+  final PollOption option;
+  final AppBrand brand;
+  final double share;
+  final int votes;
+
+  @override
+  Widget build(BuildContext context) {
+    final instant = Motion.reduced(context) || Thumbnail.of(context);
+    return LayoutBuilder(
+      builder: (context, constraints) {
+        const zoom = 2.15;
+        final size = slot.size * zoom;
+        final target = Rect.fromCenter(
+          center: Offset(constraints.maxWidth / 2, constraints.maxHeight / 2 - 10),
+          width: size.width,
+          height: size.height,
+        );
+        return TweenAnimationBuilder<double>(
+          tween: Tween(end: active ? 1 : 0),
+          duration: instant ? Duration.zero : const Duration(milliseconds: 1700),
+          builder: (context, t, _) {
+            if (t == 0) return const SizedBox.shrink();
+            // Primero viaja y crece; después se voltea.
+            final travel = Motion.inOut.transform((t / 0.45).clamp(0, 1));
+            final turn = Motion.inOut.transform(((t - 0.5) / 0.5).clamp(0, 1));
+            final rect = Rect.lerp(slot, target, travel)!;
+            final front = turn < 0.5;
+            return Stack(
+              children: [
+                Positioned.fill(
+                  child: IgnorePointer(
+                    child: ColoredBox(
+                      color: const Color(0xFF000000).withValues(alpha: 0.55 * travel),
                     ),
                   ),
                 ),
-              ),
-            ],
-          );
-        },
-      ),
+                Positioned.fromRect(
+                  rect: rect,
+                  child: Transform(
+                    alignment: Alignment.center,
+                    transform: Matrix4.identity()
+                      ..setEntry(3, 2, 0.0009)
+                      ..rotateY(turn * math.pi),
+                    // La tarjeta se arma a su tamaño de la cuadrícula y se
+                    // escala entera: crece igual que en el quiz.
+                    child: FittedBox(
+                      fit: BoxFit.fill,
+                      child: SizedBox.fromSize(
+                        size: slot.size,
+                        child: front
+                            ? _Front(option: option, brand: brand, share: share, votes: votes, index: 7)
+                            : Transform(
+                                alignment: Alignment.center,
+                                transform: Matrix4.rotationY(math.pi),
+                                child: _Back(option: option, brand: brand, share: share, spotlight: true),
+                              ),
+                      ),
+                    ),
+                  ),
+                ),
+              ],
+            );
+          },
+        );
+      },
     );
   }
 }
@@ -603,7 +756,8 @@ class _Front extends StatelessWidget {
           Row(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              AppIcon(brand, size: 80),
+              // La trampa no se delata: de frente no lleva el logo de Flutter.
+              AppIcon(brand == AppBrand.flutter ? AppBrand.slides : brand, size: 80),
               const Spacer(),
               Text(
                 '${index + 1}',

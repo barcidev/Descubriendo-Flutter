@@ -60,8 +60,21 @@ class StatusBar extends StatelessWidget {
                   '${deck.index + 1}/${deck.slides.length}',
                   style: style.copyWith(fontFeatures: DeckType.tabular),
                 ),
-                const SizedBox(width: 28),
-                const Text('Flutter 3.47 · Dart 3.13'),
+                // Nada delata que la charla es una app de Flutter hasta que
+                // se voltea la tarjeta de «Esta presentación».
+                AnimatedSize(
+                  duration: Motion.slow,
+                  curve: Motion.emphasized,
+                  child: AnimatedSwitcher(
+                    duration: Motion.slow,
+                    child: _revealed(deck)
+                        ? const Padding(
+                            padding: EdgeInsets.only(left: 28),
+                            child: Text('Flutter 3.47 · Dart 3.13'),
+                          )
+                        : const SizedBox.shrink(),
+                  ),
+                ),
                 const SizedBox(width: 24),
                 FullscreenButton(browser: browser),
               ],
@@ -71,6 +84,15 @@ class StatusBar extends StatelessWidget {
       },
     );
   }
+}
+
+/// Ya se reveló que esta charla está hecha en Flutter: el último paso de
+/// «¿Hecha con Flutter?» o cualquier diapositiva después.
+bool _revealed(DeckController deck) {
+  final reveal = deck.slides.indexWhere((slide) => slide.id == 'hecha-con-flutter');
+  if (reveal < 0) return true;
+  return deck.index > reveal ||
+      (deck.index == reveal && deck.step >= deck.slides[reveal].steps - 1);
 }
 
 class _LiveStatus extends StatelessWidget {

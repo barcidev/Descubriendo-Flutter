@@ -2,7 +2,9 @@ import 'dart:async';
 import 'dart:convert';
 import 'dart:io';
 
+import 'package:servidor/jurado.dart';
 import 'package:servidor/llave.dart';
+import 'package:servidor/proxy.dart';
 import 'package:servidor/sala.dart';
 import 'package:shelf/shelf.dart';
 import 'package:shelf/shelf_io.dart' as shelf_io;
@@ -26,7 +28,23 @@ Future<void> main() async {
   final guion =
       archivoGuion.existsSync() ? archivoGuion.readAsStringSync() : '';
 
-  final sala = Sala();
+  // Gemini escoge las excusas y las preguntas. Sin clave, el plan B.
+  final claveGemini = Platform.environment['GEMINI_API_KEY'] ?? '';
+  final jurado = claveGemini.isEmpty
+      ? null
+      : Gemini(
+          claveGemini,
+          modelo: Platform.environment['GEMINI_MODEL'] ?? 'gemini-flash-latest',
+        );
+  if (jurado == null) {
+    stdout.writeln('Aviso: sin GEMINI_API_KEY las excusas se eligen sin IA.');
+  }
+  final sala = Sala(jurado: jurado);
+  // La API en Kotlin de la demo, vista desde este mismo origen.
+  final ecoeats = reenviarA(Uri.parse(
+    Platform.environment['ECOEATS_API'] ??
+        'https://ecoeats-api-kotlin-production.up.railway.app',
+  ));
   var abiertas = 0;
   Timer.periodic(const Duration(milliseconds: 200), (_) => sala.tick());
 
@@ -116,6 +134,10 @@ Future<void> main() async {
   final deck = File('deck_web/index.html').existsSync()
       ? createStaticHandler('deck_web', defaultDocument: 'index.html')
       : null;
+  // EcoEats para web: la demo que corre dentro de la charla.
+  final ecoeatsWeb = File('ecoeats_web/index.html').existsSync()
+      ? createStaticHandler('ecoeats_web', defaultDocument: 'index.html')
+      : null;
 
   FutureOr<Response> rutas(Request request) {
     final ruta = request.url.path;
@@ -126,7 +148,7 @@ Future<void> main() async {
         return Response.ok('ok');
       case 'excusas':
         return Response.ok(
-          jsonEncode(sala.excusasAprobadas()),
+          jsonEncode(sala.excusasElegidas()),
           headers: {
             'content-type': 'application/json; charset=utf-8',
             'access-control-allow-origin': '*',
@@ -135,6 +157,14 @@ Future<void> main() async {
         );
       case 'moderar':
         return Response.found('/moderar/');
+    }
+    if (ruta.startsWith('ecoeats-api/')) {
+      return ecoeats(request.change(path: 'ecoeats-api'));
+    }
+    if (ecoeatsWeb != null &&
+        (ruta == 'ecoeats' || ruta.startsWith('ecoeats/'))) {
+      if (ruta == 'ecoeats') return Response.found('/ecoeats/');
+      return ecoeatsWeb(request.change(path: 'ecoeats'));
     }
     if (deck != null && (ruta == 'deck' || ruta.startsWith('deck/'))) {
       if (ruta == 'deck') return Response.found('/deck/');

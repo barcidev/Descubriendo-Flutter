@@ -1,5 +1,6 @@
 import 'package:material_ui/material_ui.dart';
 
+import '../engine/deck_scope.dart';
 import '../engine/slide.dart';
 import '../live/join_card.dart';
 import '../live/live_models.dart';
@@ -42,12 +43,7 @@ final doctorSlides = [
 
 const _doctorLines = [
   TermLine.command('flutter doctor --sala'),
-  TermLine(
-    'Doctor summary (to see all details, run flutter doctor -v):',
-    pause: Duration(milliseconds: 500),
-  ),
-  TermLine('[✓] Flutter (Channel stable, 3.47.8)', pause: Duration(milliseconds: 260)),
-  TermLine('[✓] Proyector (1920 × 1080)', pause: Duration(milliseconds: 260)),
+  TermLine('[✓] Proyector (1920 × 1080)', pause: Duration(milliseconds: 400)),
   TermLine('[✓] Café (dos tazas, mínimo)', pause: Duration(milliseconds: 260)),
   TermLine('[✓] Wi-Fi del auditorio (cruzando los dedos)', pause: Duration(milliseconds: 260)),
   TermLine(
@@ -55,13 +51,18 @@ const _doctorLines = [
     tone: TermTone.warning,
     pause: Duration(milliseconds: 420),
   ),
-  TermLine('    → Escanea el QR de la derecha', tone: TermTone.warning),
-  TermLine(''),
-  TermLine(
-    '! Doctor found issues in 1 category.',
-    tone: TermTone.warning,
-    pause: Duration(milliseconds: 380),
-  ),
+  TermLine('    → Escanea el QR y escribe tu nombre', tone: TermTone.warning),
+  TermLine.command('flutter logs --sala', pause: Duration(milliseconds: 700)),
+];
+
+/// Cada persona que escribe su nombre aparece en la terminal, con el widget
+/// que le tocó de apodo.
+List<TermLine> _arrivalLines(List<Arrival> arrivals) => [
+  for (final arrival in arrivals)
+    TermLine(
+      '[✓] Llegó ${arrival.name} → ${arrival.widget}()',
+      id: arrival.number,
+    ),
 ];
 
 /// Mientras la gente llega: el doctor de la sala y el QR, grande.
@@ -71,13 +72,23 @@ class _Doctor extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final colors = context.colors;
+    final live = DeckScope.of(context).live;
     return SlideScaffold(
       title: 'Antes de empezar, un chequeo',
       child: Row(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          const Expanded(
-            child: Terminal(lines: _doctorLines, title: 'zsh · auditorio', minLines: 10),
+          Expanded(
+            child: ListenableBuilder(
+              listenable: live,
+              builder: (context, _) => Terminal(
+                lines: _doctorLines,
+                extra: _arrivalLines(live.arrivals),
+                title: 'zsh · auditorio',
+                minLines: 15,
+                maxLines: 15,
+              ),
+            ),
           ),
           const SizedBox(width: 64),
           Column(
@@ -90,9 +101,9 @@ class _Doctor extends StatelessWidget {
                 child: Text.rich(
                   TextSpan(
                     children: [
-                      const TextSpan(text: 'Al entrar te toca un widget. '),
+                      const TextSpan(text: 'Escribe tu nombre y te toca un widget: '),
                       TextSpan(
-                        text: 'Sí: hoy vas a ser un widget.',
+                        text: 'ese es tu apodo de hoy.',
                         style: TextStyle(color: colors.accentText),
                       ),
                     ],

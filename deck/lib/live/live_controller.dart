@@ -6,6 +6,7 @@ import 'package:flutter/foundation.dart';
 import 'package:web_socket_channel/web_socket_channel.dart';
 
 import '../engine/browser.dart';
+import 'fallbacks.dart';
 import 'live_config.dart';
 import 'live_models.dart';
 
@@ -59,8 +60,14 @@ class LiveController extends ChangeNotifier {
   final _manualResults = <String, PollResults>{};
   int _counter = 0;
   int _manualCounter = 0;
-  List<AudienceText> _excuses = const [];
-  List<AudienceText> _questions = const [];
+  int _people = 0;
+  List<Arrival> _arrivals = const [];
+  List<Arrival> _attendees = const [];
+  TextRound _excuseRound = TextRound.closed;
+  TextRound _questionRound = TextRound.closed;
+  List<AudienceText>? _backupPicks;
+  Timer? _localRound;
+  final _random = math.Random();
   double _rating = 0;
   int _ratings = 0;
   Timer? _simulation;
@@ -87,11 +94,27 @@ class LiveController extends ChangeNotifier {
   /// Los toques del «contador más grande del mundo».
   int get counter => _counter + _manualCounter;
 
-  /// Excusas aprobadas, la más nueva primero.
-  List<AudienceText> get excuses => _excuses;
+  /// Personas que ya escribieron su nombre.
+  int get people => _people;
 
-  /// Preguntas aprobadas, las más apoyadas primero.
-  List<AudienceText> get questions => _questions;
+  /// Las últimas llegadas, la más nueva al final.
+  List<Arrival> get arrivals => _arrivals;
+
+  /// Todos los que dieron su nombre, en orden de llegada: los créditos.
+  List<Arrival> get attendees => _attendees;
+
+  /// La ronda de excusas: el servidor la lleva; sin él, la charla.
+  TextRound get excuseRound => _excuseRound;
+
+  /// Las preguntas que escogió la IA, cuando llegan a su diapositiva.
+  TextRound get questionRound => _questionRound;
+
+  /// Las excusas que salieron en pantalla. Mientras no haya ronda, las de
+  /// respaldo: así la demo de la API muestra lo mismo que se vio antes.
+  List<AudienceText> get shownExcuses =>
+      _excuseRound.phase == RoundPhase.ready && _excuseRound.picks.isNotEmpty
+      ? _excuseRound.picks
+      : _backupPicks ??= pickBackupExcuses(_random);
 
   double get rating => _rating;
   int get ratings => _ratings;
@@ -101,6 +124,10 @@ class LiveController extends ChangeNotifier {
 
   /// Órdenes del celular del presentador: `next` o `prev`.
   Stream<String> get navigation => _navigation.stream;
+
+  /// Los votos de toda la charla: cada persona cuenta una vez por votación.
+  int get totalVotes => {..._serverResults.keys, ..._manualResults.keys}
+      .fold(0, (total, id) => total + resultsFor(id).voters);
 
   /// Los votos de [pollId]: los del servidor más los de mano alzada.
   PollResults resultsFor(String pollId) =>
@@ -239,9 +266,30 @@ class LiveController extends ChangeNotifier {
       _onAccess(json);
       return;
     }
+    if (json['t'] == 'asistentes') {
+      _attendees = [
+        for (final (index, item) in (json['lista'] as List? ?? const []).indexed)
+          if (item case final Map<String, Object?> map)
+            Arrival.fromJson({...map, 'n': index + 1}),
+      ];
+      notifyListeners();
+      return;
+    }
     if (json['t'] != 'estado') return;
+    final now = DateTime.now();
     _connected = (json['connected'] as num? ?? 0).toInt();
     _counter = (json['counter'] as num? ?? 0).toInt();
+    _people = (json['people'] as num? ?? 0).toInt();
+    _arrivals = [
+      for (final item in (json['joins'] as List? ?? const []))
+        if (item case final Map<String, Object?> map) Arrival.fromJson(map),
+    ];
+    if (json['excuseRound'] case final Map<String, Object?> round) {
+      _excuseRound = TextRound.fromJson(round, now);
+    }
+    if (json['questionRound'] case final Map<String, Object?> round) {
+      _questionRound = TextRound.fromJson(round, now);
+    }
     final polls = json['polls'] as Map? ?? const {};
     _serverResults
       ..clear()
@@ -249,15 +297,6 @@ class LiveController extends ChangeNotifier {
         for (final MapEntry(:key, :value) in polls.entries)
           key as String: PollResults.fromJson(value as Map<String, Object?>),
       });
-    List<AudienceText> visible(Object? list) => [
-      for (final item in (list as List? ?? const []))
-        if (item case final Map<String, Object?> map
-            when map['approved'] == true && map['hidden'] != true)
-          AudienceText.fromJson(map),
-    ];
-    _excuses = visible(json['excuses']).reversed.toList();
-    _questions = visible(json['questions'])
-      ..sort((a, b) => b.votes.compareTo(a.votes));
     final rating = json['rating'] as Map? ?? const {};
     _rating = (rating['average'] as num? ?? 0).toDouble();
     _ratings = (rating['total'] as num? ?? 0).toInt();
@@ -316,6 +355,90 @@ class LiveController extends ChangeNotifier {
     if (cue == _cue) return;
     _cue = cue;
     if (_access == PresenterAccess.granted) _send({'t': 'cue', 'cue': cue.toJson()});
+    if (!online) _localRounds(cue);
+    notifyListeners();
+  }
+
+  /// Pide la lista de asistentes para los créditos. Sin servidor, los del
+  /// ensayo.
+  void requestAttendees() {
+    if (online) {
+      _send({'t': 'asistentes'});
+    } else {
+      _attendees = _simulatedAttendees;
+      notifyListeners();
+    }
+  }
+
+  /// Sin servidor, las rondas siguen las mismas reglas que en el servidor:
+  /// la de excusas se abre con su tiempo y, al cerrar, salen las de
+  /// respaldo; las preguntas solo existen en el ensayo.
+  void _localRounds(AudienceCue cue) {
+    switch (cue.mode) {
+      case AudienceMode.excuse when cue.open:
+        if (_excuseRound.phase != RoundPhase.closed) return;
+        _excuseRound = TextRound(
+          phase: RoundPhase.open,
+          deadline: DateTime.now().add(Duration(seconds: cue.seconds ?? 60)),
+        );
+        _localRound?.cancel();
+        _localRound = Timer.periodic(const Duration(milliseconds: 400), (_) {
+          if (_excuseRound.phase != RoundPhase.open) {
+            _localRound?.cancel();
+          } else if (_excuseRound.remaining(DateTime.now()) == Duration.zero) {
+            _closeLocalExcuses();
+          } else if (simulating && _random.nextDouble() < 0.35) {
+            _excuseRound = _excuseRound.copyWith(received: _excuseRound.received + 1);
+            notifyListeners();
+          }
+        });
+      case AudienceMode.excuse:
+        if (_excuseRound.phase == RoundPhase.open) _closeLocalExcuses();
+      case AudienceMode.questions:
+        if (_questionRound.phase != RoundPhase.closed) return;
+        _questionRound = const TextRound(phase: RoundPhase.choosing);
+        Timer(const Duration(seconds: 3), () {
+          if (_disposed) return;
+          _questionRound = TextRound(
+            phase: RoundPhase.ready,
+            received: simulating ? 14 : 0,
+            picks: [
+              if (simulating)
+                for (final (index, (text, author)) in rehearsalQuestions.indexed)
+                  AudienceText(id: 'q$index', text: text, author: author, approved: true),
+            ],
+          );
+          notifyListeners();
+        });
+      default:
+        break;
+    }
+  }
+
+  void _closeLocalExcuses() {
+    _localRound?.cancel();
+    _excuseRound = _excuseRound.copyWith(phase: RoundPhase.choosing);
+    notifyListeners();
+    Timer(const Duration(milliseconds: 2500), () {
+      if (_disposed) return;
+      _excuseRound = _excuseRound.copyWith(
+        phase: RoundPhase.ready,
+        picks: _backupPicks ??= pickBackupExcuses(_random),
+      );
+      notifyListeners();
+    });
+  }
+
+  /// Vuelve a empezar las rondas locales (para ensayar otra vez).
+  void resetRounds() {
+    _localRound?.cancel();
+    _excuseRound = TextRound.closed;
+    _questionRound = TextRound.closed;
+    _backupPicks = null;
+    if (online) {
+      _send({'t': 'reiniciar', 'que': 'excusas'});
+      _send({'t': 'reiniciar', 'que': 'preguntas'});
+    }
     notifyListeners();
   }
 
@@ -351,14 +474,22 @@ class LiveController extends ChangeNotifier {
     notifyListeners();
   }
 
-  static const _rehearsalExcuses = [
-    'En staging no pasaba, lo juro.',
-    'El cliente tiene el celular en modo ahorro.',
-    'Fue culpa del merge de las 5:59 p. m.',
-  ];
+  final _simulatedAttendees = <Arrival>[];
 
   void _simulate(math.Random random) {
     if (!online && _connected < 64) _connected += random.nextInt(4);
+    // Llegan personas con nombre y apodo, como en la sala.
+    if (!online && _simulatedAttendees.length < 60 && random.nextDouble() < 0.3) {
+      final number = _simulatedAttendees.length + 1;
+      final arrival = Arrival(
+        number: number,
+        name: rehearsalNames[random.nextInt(rehearsalNames.length)],
+        widget: rehearsalWidgets[random.nextInt(rehearsalWidgets.length)],
+      );
+      _simulatedAttendees.add(arrival);
+      _people = number;
+      _arrivals = [..._arrivals.skip(math.max(0, _arrivals.length - 39)), arrival];
+    }
     final poll = _cue.poll;
     if (_cue.mode == AudienceMode.poll && poll != null && _cue.open) {
       final current = _manualResults[poll.id] ?? PollResults.empty;
@@ -376,18 +507,6 @@ class LiveController extends ChangeNotifier {
       }
     } else if (_cue.mode == AudienceMode.counter) {
       _manualCounter += random.nextInt(9);
-    } else if (_cue.mode == AudienceMode.excuse &&
-        _excuses.length < _rehearsalExcuses.length &&
-        random.nextDouble() < 0.08) {
-      _excuses = [
-        AudienceText(
-          id: 'ensayo-${_excuses.length}',
-          text: _rehearsalExcuses[_excuses.length],
-          author: 'Expanded',
-          approved: true,
-        ),
-        ..._excuses,
-      ];
     }
     if (random.nextDouble() < 0.12) {
       _reactions.add(const ['fuego', 'bug', 'aplauso'][random.nextInt(3)]);
@@ -410,6 +529,7 @@ class LiveController extends ChangeNotifier {
   void dispose() {
     _disposed = true;
     _simulation?.cancel();
+    _localRound?.cancel();
     _reconnect?.cancel();
     _heartbeat?.cancel();
     unawaited(_subscription?.cancel());

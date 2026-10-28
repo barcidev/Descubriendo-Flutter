@@ -33,6 +33,8 @@ flutter:
 
   assets:
     - assets/brand/
+    - assets/demo/
+    - assets/creditos/
     - assets/media/
 
   fonts:

@@ -21,6 +21,19 @@ abstract final class Config {
     'IEEE Computer Society UAC',
   ];
 
+  /// Los logos para los créditos y el cierre (recortados de la pieza
+  /// oficial de la charla), con su nombre.
+  static const organizerLogos = [
+    ('assets/creditos/baqjug.png', 'BAQ JUG'),
+    ('assets/creditos/devjvm.png', 'DevJVM'),
+    ('assets/creditos/gniem.png', 'Gniem'),
+    ('assets/creditos/caribedev.png', 'CaribeDev'),
+    ('assets/creditos/ieee.png', 'IEEE Computer Society UAC'),
+  ];
+
+  static const venueLogo = 'assets/creditos/uac.png';
+  static const presenterPhoto = 'assets/creditos/jorge.png';
+
   /// El servidor de votaciones por defecto. Vacío: se pide en la URL.
   static const server = String.fromEnvironment('SERVIDOR');
 }

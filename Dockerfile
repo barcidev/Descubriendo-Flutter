@@ -7,8 +7,9 @@ WORKDIR /app
 COPY servidor/pubspec.* ./
 RUN dart pub get
 COPY servidor/ ./
-# La copia de la charla en /deck/ es opcional: si no está, la carpeta queda vacía.
-RUN mkdir -p deck_web \
+# Las copias de la charla (/deck/) y de EcoEats web (/ecoeats/) son
+# opcionales: si no están, las carpetas quedan vacías.
+RUN mkdir -p deck_web ecoeats_web \
  && dart pub get --offline \
  && dart compile exe bin/server.dart -o bin/server
 
@@ -18,6 +19,7 @@ COPY --from=build /app/bin/server /app/bin/server
 COPY --from=build /app/public/ /app/public/
 COPY --from=build /app/privado/ /app/privado/
 COPY --from=build /app/deck_web/ /app/deck_web/
+COPY --from=build /app/ecoeats_web/ /app/ecoeats_web/
 WORKDIR /app
 EXPOSE 8080
 CMD ["/app/bin/server"]

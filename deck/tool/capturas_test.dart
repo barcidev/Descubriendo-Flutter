@@ -24,7 +24,21 @@ import 'package:material_ui/material_ui.dart';
 final _out = Directory('build/capturas');
 
 /// Diapositivas que se capturan en cada paso, no solo en el último.
-const _everyStep = {'agenda', 'pantalla-roja', 'hecha-con-flutter'};
+const _everyStep = {
+  'agenda',
+  'pantalla-roja',
+  'hecha-con-flutter',
+  'excusometro-en-vivo',
+  'hot-reload',
+  'publicar',
+};
+
+/// Cuánto esperar (en tiempo de mentira) antes de la captura, si no basta
+/// con lo normal: la terminal de la demo tarda en «compilar».
+const _longer = {'doctor': 12000, 'demo': 9000, 'creditos': 4000};
+
+/// Esperas en tiempo real: estas diapositivas miden con el reloj de verdad.
+const _realWait = {'excusometro-en-vivo': 3600, 'preguntas': 10500};
 
 Future<void> _loadFonts() async {
   Future<void> load(String family, List<String> files) async {
@@ -92,6 +106,16 @@ void main() {
       for (final logo in [
         'assets/brand/flutter_lockup_white.png',
         'assets/brand/flutter_lockup.png',
+        'assets/brand/flutter_mark.png',
+        'assets/demo/ecoeats_icon.png',
+        'assets/demo/ecoeats_splash.png',
+        'assets/creditos/jorge.png',
+        'assets/creditos/baqjug.png',
+        'assets/creditos/devjvm.png',
+        'assets/creditos/gniem.png',
+        'assets/creditos/caribedev.png',
+        'assets/creditos/ieee.png',
+        'assets/creditos/uac.png',
       ]) {
         await precacheImage(AssetImage(logo), context);
       }
@@ -110,10 +134,25 @@ void main() {
           await _wait(tester, 300);
           continue;
         }
-        await _wait(tester, 3200);
+        await _wait(tester, _longer[slide.id] ?? 3200);
+        if (_realWait[slide.id] case final milliseconds?) {
+          await tester.runAsync(() => Future<void>.delayed(Duration(milliseconds: milliseconds)));
+          await _wait(tester, 3200);
+        }
         await _shot(tester, last && !_everyStep.contains(slide.id)
             ? '$number-${slide.id}'
             : '$number-${slide.id}-paso-${step + 1}');
+      }
+      if (slide.id == 'creditos') {
+        // El rollo sigue subiendo: el elenco, los organizadores y la escena
+        // post-créditos.
+        for (final (index, wait) in [12000, 12000, 12000, 16000].indexed) {
+          await _wait(tester, wait);
+          await _shot(tester, '$number-${slide.id}-${index + 2}');
+        }
+        await _wait(tester, 8000);
+        await _shot(tester, '$number-${slide.id}-post');
+        continue;
       }
       if (index == 0) {
         await _key(tester, LogicalKeyboardKey.keyQ);

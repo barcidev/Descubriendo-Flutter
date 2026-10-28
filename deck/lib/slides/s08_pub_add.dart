@@ -38,8 +38,8 @@ const _advice = [
   (
     'Mientras construyes',
     [
-      ('Un solo gestor de estado', 'El que sea, pero uno.'),
-      ('Modelos inmutables, errores con tipo', 'sealed + switch: el compilador te cuida.'),
+      ('Un solo gestor de estado', 'setState para una pantalla. Para la app: Provider, Riverpod o Bloc. El que sea, pero uno.'),
+      ('Modelos inmutables', 'Los datos no cambian a tus espaldas.'),
       ('Diseña los estados tristes', 'Cargando, vacío, error, sin red.'),
       ('Accesibilidad e idiomas desde el inicio', 'Después cuesta el triple.'),
     ],

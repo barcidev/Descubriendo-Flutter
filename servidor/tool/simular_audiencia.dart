@@ -16,6 +16,11 @@ const _excusas = [
   'Eso estaba así cuando llegué.',
 ];
 
+const _nombres = [
+  'Valentina', 'Andrés', 'Camila', 'Santiago', 'Daniela', 'Sebastián',
+  'María José', 'Juan David', 'Laura', 'Carlos', 'Mariana', 'Alejandro',
+];
+
 const _preguntas = [
   '¿Flutter sirve para hacer apps web grandes?',
   '¿Qué tan difícil es pasar de Kotlin a Dart?',
@@ -55,6 +60,8 @@ Future<void> _cliente(String url, int numero, math.Random azar) async {
   }
   void enviar(Map<String, Object?> mensaje) => socket.add(jsonEncode(mensaje));
   enviar({'t': 'hola', 'id': 'simulado-${numero.toString().padLeft(5, '0')}'});
+  // Como en la sala: primero el nombre, después todo lo demás.
+  enviar({'t': 'nombre', 'nombre': '${_nombres[numero % _nombres.length]} ${numero + 1}'});
 
   Map<String, Object?> cue = const {'mode': 'idle'};
   final votadas = <String>{};
@@ -77,18 +84,19 @@ Future<void> _cliente(String url, int numero, math.Random azar) async {
       case 'counter':
         enviar({'t': 'toque', 'n': 1 + azar.nextInt(6)});
       case 'excuse':
-        if (!escribio && azar.nextDouble() < 0.05) {
+        if (!escribio && azar.nextDouble() < 0.2) {
           escribio = true;
           enviar({'t': 'excusa', 'texto': _excusas[azar.nextInt(_excusas.length)]});
-        }
-      case 'questions':
-        if (azar.nextDouble() < 0.02) {
-          enviar({'t': 'pregunta', 'texto': _preguntas[azar.nextInt(_preguntas.length)]});
         }
       case 'rating':
         if (!califico && azar.nextDouble() < 0.3) {
           califico = true;
           enviar({'t': 'estrellas', 'n': 3 + azar.nextInt(3)});
+        }
+      default:
+        // Las preguntas se escriben en cualquier momento de la charla.
+        if (azar.nextDouble() < 0.004) {
+          enviar({'t': 'pregunta', 'texto': _preguntas[azar.nextInt(_preguntas.length)]});
         }
     }
     if (azar.nextDouble() < 0.04) {

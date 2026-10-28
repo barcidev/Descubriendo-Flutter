@@ -20,7 +20,7 @@
   }
 
   const misVotos = leer('charla.votos', {});
-  const misApoyos = new Set(leer('charla.apoyos', []));
+  let miNombre = leer('charla.nombre', null);
   let misExcusas = leer('charla.excusas', 0);
   let misEstrellas = leer('charla.estrellas', 0);
 
@@ -30,6 +30,8 @@
   let modoPintado = '';
   let toques = 0;
   let borrador = {};
+  // Cuándo se cierra la ronda de excusas, en la hora de este celular.
+  let finExcusas = 0;
 
   // ---------- Conexión ----------
 
@@ -38,14 +40,20 @@
     socket = new WebSocket(`${protocolo}://${location.host}/ws`);
     socket.onopen = () => {
       intentos = 0;
-      enviar({ t: 'hola', id: cliente });
+      enviar({ t: 'hola', id: cliente, nombre: miNombre || undefined });
       marcar(true);
     };
     socket.onmessage = (evento) => {
       const mensaje = JSON.parse(evento.data);
       if (mensaje.t === 'yo') pintarYo(mensaje);
+      if (mensaje.t === 'nombre' && mensaje.ok === false) {
+        $('notaNombre').textContent = 'Ese nombre no pasó el linter. Prueba con otro.';
+        $('formNombre').querySelector('button').disabled = false;
+      }
       if (mensaje.t === 'estado') {
         estado = mensaje;
+        const ronda = estado.excuseRound || {};
+        finExcusas = ronda.phase === 'abierta' ? Date.now() + ronda.remaining * 1000 : 0;
         pintar();
       }
     };
@@ -73,13 +81,40 @@
     }
   }, 220);
 
+  // ---------- El nombre ----------
+
+  $('formNombre').addEventListener('submit', (evento) => {
+    evento.preventDefault();
+    const nombre = $('textoNombre').value.trim().replace(/\s+/g, ' ');
+    if (nombre.length < 2) { $('notaNombre').textContent = 'Escribe tu nombre.'; return; }
+    $('notaNombre').textContent = '';
+    $('formNombre').querySelector('button').disabled = true;
+    enviar({ t: 'nombre', nombre });
+  });
+
   // ---------- Pintar ----------
 
   function pintarYo(yo) {
+    Object.assign(misVotos, yo.votos || {});
+    if (!yo.nombre) {
+      // Primero el nombre: sin él no se entra.
+      $('bienvenida').hidden = false;
+      $('yo').hidden = true;
+      $('preguntar').hidden = true;
+      $('pantalla').replaceChildren();
+      modoPintado = '';
+      setTimeout(() => $('textoNombre').focus(), 50);
+      return;
+    }
+    miNombre = yo.nombre;
+    guardar('charla.nombre', miNombre);
+    $('bienvenida').hidden = true;
     $('yo').hidden = false;
+    $('preguntar').hidden = false;
+    $('saludo').textContent = `Hola, ${miNombre}. Tu apodo de hoy`;
     $('widget').textContent = yo.widget;
     $('frase').textContent = yo.frase;
-    Object.assign(misVotos, yo.votos || {});
+    if (estado) pintar();
   }
 
   function el(etiqueta, clase, texto) {
@@ -91,6 +126,7 @@
 
   function pintar() {
     $('conectados').textContent = `${estado.connected} conectados`;
+    if (!miNombre || $('yo').hidden) return;
     const cue = estado.cue || { mode: 'idle' };
     const clave = cue.mode + (cue.poll ? cue.poll.id : '');
     // Si la pantalla es la misma, solo se actualizan los números: así no se
@@ -105,6 +141,7 @@
       case 'excuse': pintarExcusa(pantalla); break;
       case 'questions': pintarPreguntas(pantalla); break;
       case 'rating': pintarEstrellas(pantalla); break;
+      case 'credits': pintarCreditos(pantalla); break;
       default: pintarEspera(pantalla);
     }
   }
@@ -113,9 +150,8 @@
   function actualizar(cue) {
     if (cue.mode === 'poll') { pintarResultados(cue); return true; }
     if (cue.mode === 'counter') { $('total').textContent = estado.counter; return true; }
-    if (cue.mode === 'questions') { pintarListaPreguntas(); return true; }
-    if (cue.mode === 'rating' || cue.mode === 'excuse' || cue.mode === 'idle') return true;
-    return false;
+    if (cue.mode === 'excuse') { relojExcusas(); return true; }
+    return ['rating', 'questions', 'credits', 'idle'].includes(cue.mode);
   }
 
   function pintarEspera(pantalla) {
@@ -204,7 +240,7 @@
     pantalla.append(caja);
   }
 
-  function formulario({ titulo, ayuda, maximo, marcador, boton, alEnviar, limite }) {
+  function formulario({ titulo, ayuda, maximo, marcador, boton, alEnviar, limite, enviada }) {
     const form = el('form', 'formulario');
     const texto = el('textarea');
     texto.maxLength = maximo;
@@ -224,60 +260,63 @@
       alEnviar(valor);
       texto.value = '';
       borrador[titulo] = '';
-      nota.textContent = 'Enviada. Si pasa el code review, sale en pantalla.';
+      nota.textContent = enviada;
     });
     return [el('h2', null, titulo), el('p', 'ayuda', ayuda), form];
   }
 
   function pintarExcusa(pantalla) {
-    pantalla.append(...formulario({
+    const reloj = el('p', 'reloj', '');
+    reloj.id = 'relojExcusas';
+    const [titulo, ayuda, form] = formulario({
       titulo: 'Tu mejor excusa de dev',
-      ayuda: 'La que más has usado. Las aprobadas salen en la tarjeta en vivo.',
+      ayuda: 'La que más has usado. Al acabar el tiempo, una IA escoge las mejores para la pantalla.',
       maximo: 140,
       marcador: 'Ej: en mi máquina sí funciona',
       boton: 'Enviar excusa',
       limite: () => misExcusas < 3,
+      enviada: 'Enviada. Puedes mandar hasta tres.',
       alEnviar: (texto) => {
         enviar({ t: 'excusa', texto });
         guardar('charla.excusas', ++misExcusas);
       },
-    }));
+    });
+    form.id = 'formExcusa';
+    pantalla.append(titulo, reloj, ayuda, form);
+    relojExcusas();
   }
+
+  // La cuenta regresiva de las excusas: la lleva el celular, a partir de lo
+  // que falta según el servidor.
+  function relojExcusas() {
+    const reloj = $('relojExcusas');
+    if (!reloj) return;
+    const fase = (estado.excuseRound || {}).phase;
+    const falta = Math.max(0, Math.ceil((finExcusas - Date.now()) / 1000));
+    const abierta = fase === 'abierta' && falta > 0;
+    reloj.classList.toggle('fin', !abierta);
+    reloj.textContent = abierta
+      ? `${Math.floor(falta / 60)}:${String(falta % 60).padStart(2, '0')}`
+      : fase === 'cerrada' ? 'Espera la señal…' : 'Tiempo. Mira la pantalla.';
+    const form = $('formExcusa');
+    if (form) for (const campo of form.querySelectorAll('textarea, button')) campo.disabled = !abierta;
+  }
+  setInterval(relojExcusas, 250);
 
   function pintarPreguntas(pantalla) {
     pantalla.append(
       el('h2', null, 'Preguntas'),
-      el('p', 'ayuda', 'Apoya las que también quieres escuchar. Escribe la tuya abajo.'),
+      el('p', 'ayuda', 'Mira la pantalla: una IA junta las que se parecen y escoge cinco. ¿Te falta la tuya? Escríbela abajo.'),
     );
-    const lista = el('ul', 'lista');
-    lista.id = 'listaPreguntas';
-    pantalla.append(lista);
-    pintarListaPreguntas();
     $('preguntar').open = true;
   }
 
-  function pintarListaPreguntas() {
-    const lista = $('listaPreguntas');
-    if (!lista) return;
-    lista.replaceChildren();
-    for (const pregunta of estado.questions || []) {
-      const item = el('li', pregunta.done ? 'respondida' : '');
-      const cuerpo = el('div', 'cuerpo');
-      cuerpo.append(el('span', null, pregunta.text), el('span', 'autor', `${pregunta.author}()`));
-      const apoyo = el('button', `apoyo${misApoyos.has(pregunta.id) ? ' hecho' : ''}`, `+${pregunta.votes}`);
-      apoyo.type = 'button';
-      apoyo.disabled = misApoyos.has(pregunta.id);
-      apoyo.addEventListener('click', () => {
-        misApoyos.add(pregunta.id);
-        guardar('charla.apoyos', [...misApoyos]);
-        enviar({ t: 'apoyo', id: pregunta.id });
-        apoyo.classList.add('hecho');
-        apoyo.disabled = true;
-      });
-      item.append(cuerpo, apoyo);
-      lista.append(item);
-    }
-    if (!lista.children.length) lista.append(el('li', null, 'Todavía no hay preguntas aprobadas.'));
+  function pintarCreditos(pantalla) {
+    pantalla.append(
+      el('p', 'grande', '🎬'),
+      el('h2', null, 'Busca tu nombre en la pantalla'),
+      el('p', 'ayuda', `${miNombre}, saliste en los créditos.`),
+    );
   }
 
   const leyendas = [
@@ -322,7 +361,7 @@
     if (texto.length < 3) { nota.textContent = 'Escribe un poquito más.'; return; }
     enviar({ t: 'pregunta', texto });
     $('textoPregunta').value = '';
-    nota.textContent = 'Recibida. Si pasa la moderación, sale en pantalla.';
+    nota.textContent = 'Recibida. Al final, una IA escoge las que cubren más dudas.';
   });
 
   let ultimaReaccion = 0;

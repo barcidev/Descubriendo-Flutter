@@ -17,3 +17,6 @@ services:
     envVars:
       - key: PRESENTER_TOKEN
         sync: false
+      # Gemini escoge las excusas y las preguntas. Sin clave, plan B.
+      - key: GEMINI_API_KEY
+        sync: false
