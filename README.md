@@ -69,6 +69,8 @@ render services create --name flutter-baq --type web_service \
 
 Después agrega `PRESENTER_TOKEN` en Environment, en el dashboard. Los pasos completos están en `PREPARACION.md`.
 
+Como el servicio apunta a la URL pública del repositorio, Render no se entera de los push. Después de cada cambio, despliega a mano con `render deploys create <id-del-servicio>`, o conecta GitHub en Render para que sea automático.
+
 ## Teclas
 
 | Tecla | Acción |

@@ -41,6 +41,7 @@ render services create --name flutter-baq --type web_service \
 Otra opción es el dashboard: **New → Blueprint**, eliges el repositorio y Render lee `render.yaml` (`render blueprints validate render.yaml` ya lo da por válido). Ahí te pide el `PRESENTER_TOKEN`.
 
 1. Espera el primer build, de 3 a 5 minutos (`render logs` para seguirlo).
+   Después de cada push hay que desplegar a mano: `render deploys create srv-dbgrrpmgekts738o13a0`. Render no recibe los push porque el repositorio no está conectado a GitHub en Render.
 2. La URL queda como `https://flutter-baq.onrender.com`. Si ese nombre está ocupado, Render le agrega un sufijo.
 3. Comprueba que `/health` responda `ok`.
 
