@@ -10,6 +10,7 @@ import 'engine/slide.dart';
 import 'live/live_config.dart';
 import 'live/live_controller.dart';
 import 'slides/s09_run.dart' show demoAppPath;
+import 'slides/s12_concurso.dart' show quizBank;
 import 'slides/slides.dart';
 import 'theme/deck_theme.dart';
 import 'theme/tokens.dart';
@@ -46,6 +47,9 @@ class _DeckAppState extends State<DeckApp> {
       step: start?.$2 ?? 0,
     )..addListener(_sync);
     _night = _deck.night;
+    // Las preguntas del concurso: el servidor las necesita antes de abrir
+    // la primera.
+    _live.loadQuiz(quizBank);
     // La app de la demo arranca desde ya, escondida: al llegar a su
     // diapositiva no hay pantalla en blanco.
     if (_deck.slides.any((slide) => slide.id == 'demo')) {

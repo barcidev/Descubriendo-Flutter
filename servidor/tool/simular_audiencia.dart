@@ -64,7 +64,9 @@ Future<void> _cliente(String url, int numero, math.Random azar) async {
   enviar({'t': 'nombre', 'nombre': '${_nombres[numero % _nombres.length]} ${numero + 1}'});
 
   Map<String, Object?> cue = const {'mode': 'idle'};
+  Map<String, Object?> concurso = const {};
   final votadas = <String>{};
+  final respondidas = <int>{};
   var escribio = false;
   var califico = false;
 
@@ -88,6 +90,18 @@ Future<void> _cliente(String url, int numero, math.Random azar) async {
           escribio = true;
           enviar({'t': 'excusa', 'texto': _excusas[azar.nextInt(_excusas.length)]});
         }
+      case 'quiz':
+        // Cada quien responde a su ritmo; unos aciertan, otros no.
+        final indice = concurso['index'];
+        final opciones = concurso['options'];
+        if (concurso['phase'] == 'pregunta' &&
+            indice is int &&
+            opciones is List &&
+            !respondidas.contains(indice) &&
+            azar.nextDouble() < 0.12) {
+          respondidas.add(indice);
+          enviar({'t': 'respuesta', 'index': indice, 'opcion': azar.nextInt(opciones.length)});
+        }
       case 'rating':
         if (!califico && azar.nextDouble() < 0.3) {
           califico = true;
@@ -107,7 +121,10 @@ Future<void> _cliente(String url, int numero, math.Random azar) async {
   await for (final mensaje in socket) {
     if (mensaje is! String) continue;
     final json = jsonDecode(mensaje) as Map<String, Object?>;
-    if (json['t'] == 'estado') cue = json['cue']! as Map<String, Object?>;
+    if (json['t'] == 'estado') {
+      cue = json['cue']! as Map<String, Object?>;
+      concurso = (json['quiz'] as Map<String, Object?>?) ?? const {};
+    }
   }
   ritmo.cancel();
 }

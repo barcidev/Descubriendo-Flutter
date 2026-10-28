@@ -4,7 +4,7 @@ Charla del 28 de octubre de 2026, 6:00 p. m., Universidad Autónoma del Caribe.
 
 | Carpeta | Qué es |
 |---|---|
-| `deck/` | La presentación: una app de Flutter Web (36 diapositivas). |
+| `deck/` | La presentación: una app de Flutter Web (37 diapositivas). |
 | `servidor/` | Las votaciones en vivo: servidor en Dart (shelf + WebSocket), la página del celular, la página de moderación y el guion. |
 | `contador/` | La plantilla de `flutter create` con 10 líneas más: escucha los toques del público. Es para el hot reload en vivo. |
 | `GUION.md` | Copia para imprimir de las notas de cada diapositiva. La fuente es `servidor/privado/guion.md`, que solo se entrega a quien entra con el token. |
@@ -107,8 +107,18 @@ En vivo, en `contador/lib/main.dart`:
 
 - **Dentro de la charla (33):** EcoEats web corre en el iPhone dibujado. La charla la carga escondida desde que abre, así que al llegar ya está lista. Con `presentar.sh` se sirve en `http://127.0.0.1:8090/ecoeats/`. Inicia sesión una vez en el ensayo: queda guardada en el Chrome de la charla.
 - **El Chrome de la charla:** `presentar.sh` abre Chrome con un perfil propio (`~/.descubriendo-flutter/chrome`), como ventana de app y en pantalla completa del sistema: Esc no la quita, y no ofrece guardar contraseñas, autocompletar ni traducir. La primera vez pide el token del presentador.
-- **Después de los créditos (35):** cinco segundos después de la escena post-créditos, `presentar.sh` trae al frente las apps de `DEMO_APPS` (por omisión `Simulator`) y la charla pasa sola al cierre. Para traer también el editor: `DEMO_APPS="Visual Studio Code,Simulator" ./presentar.sh https://flutter-baq.onrender.com`. Usa `open -a`, que no pide permisos especiales de macOS.
+- **Después de los créditos (35):** cinco segundos después de la escena post-créditos, `presentar.sh` trae al frente Antigravity IDE y, encima, el simulador, y la charla pasa sola al concurso (36). Para traer otras apps: `DEMO_APPS="Simulator" ./presentar.sh https://flutter-baq.onrender.com` (solo el simulador). Usa `open -a`, que no pide permisos especiales de macOS.
 - EcoEats ya está en el simulador iPhone 16e con la sesión iniciada: no lo cierres. Corre la app `contador` en otro simulador (iPhone 17 Pro), así las dos quedan listas en ventanas separadas.
+
+## 7. El concurso (diapositiva 36)
+
+- **Arranque:** al volver del simulador (Cmd+Tab), la charla está en la portada del concurso: las reglas, cuántos jugadores hay y el botón «Comenzar». Arranca con ese botón, con → o con el botón «▶ Comenzar el concurso» de `/moderar/`.
+- **Cada pregunta:** dura 30 segundos. Se cierra sola cuando se acaba el tiempo o cuando todos respondieron, y la charla pasa sola a la respuesta y la tabla. Si quieres cerrarla antes, un clic.
+- **Juegan** solo quienes dieron su nombre, y cuenta la primera respuesta de cada uno.
+- **En la tabla,** un clic abre la siguiente pregunta. Después de la décima, el podio. El siguiente clic va al cierre (37).
+- **En `/moderar/`,** el botón dice lo que va a pasar («Cerrar la pregunta», «Siguiente pregunta →», «Ver el podio 🏆») y debajo ves cuántos respondieron.
+- **Si lo ensayas antes en Render,** no pasa nada: cada vez que la charla vuelve a la portada del concurso, empieza de cero.
+- **Sin servidor,** la tecla S pone a jugar a los asistentes de ensayo con las mismas reglas.
 
 ## Checklist del día
 

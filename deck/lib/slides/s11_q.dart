@@ -17,6 +17,7 @@ import '../ui/flutter_lockup.dart';
 import '../ui/qr_code.dart';
 import '../ui/reveal.dart';
 import '../ui/terminal.dart';
+import 's12_concurso.dart';
 import 'sections.dart';
 
 final quitSlides = [
@@ -28,6 +29,7 @@ final quitSlides = [
     cue: (step) => const AudienceCue.credits(),
     builder: (context, step) => const _Credits(),
   ),
+  contestSlide,
   Slide(
     id: 'application-finished',
     section: quitSection,
@@ -97,8 +99,9 @@ class _CreditsState extends State<_Credits> with SingleTickerProviderStateMixin 
       _scene?.cancel();
       final scope = DeckScope.of(context);
       unawaited(scope.browser.showDemoApps());
-      final finale = scope.deck.slides.indexWhere((slide) => slide.id == 'application-finished');
-      if (finale >= 0 && scope.deck.slide.id == 'creditos') scope.deck.goTo(finale);
+      // Al volver del Mac, la charla espera en el concurso.
+      final contest = scope.deck.slides.indexWhere((slide) => slide.id == 'concurso');
+      if (contest >= 0 && scope.deck.slide.id == 'creditos') scope.deck.goTo(contest);
     }
   }
 

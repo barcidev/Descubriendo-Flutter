@@ -6,7 +6,7 @@
 //   cd servidor && fvm dart run tool/presentar.dart ../deck/build/web
 //
 // Las apps que se traen al frente salen de DEMO_APPS (separadas por coma),
-// por omisión el simulador de iOS.
+// por omisión el editor (Antigravity) y encima el simulador de iOS.
 import 'dart:io';
 
 import 'package:servidor/proxy.dart';
@@ -28,7 +28,7 @@ Future<void> main(List<String> args) async {
     Platform.environment['ECOEATS_API'] ??
         'https://ecoeats-api-kotlin-production.up.railway.app',
   ));
-  final apps = (Platform.environment['DEMO_APPS'] ?? 'Simulator')
+  final apps = (Platform.environment['DEMO_APPS'] ?? 'Antigravity IDE,Simulator')
       .split(',')
       .map((app) => app.trim())
       .where((app) => app.isNotEmpty)

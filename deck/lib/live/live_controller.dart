@@ -65,6 +65,8 @@ class LiveController extends ChangeNotifier {
   List<Arrival> _attendees = const [];
   TextRound _excuseRound = TextRound.closed;
   TextRound _questionRound = TextRound.closed;
+  QuizState _quiz = QuizState.initial;
+  List<QuizQuestion> _quizBank = const [];
   List<AudienceText>? _backupPicks;
   Timer? _localRound;
   final _random = math.Random();
@@ -108,6 +110,25 @@ class LiveController extends ChangeNotifier {
 
   /// Las preguntas que escogió la IA, cuando llegan a su diapositiva.
   TextRound get questionRound => _questionRound;
+
+  /// El concurso del final: la pregunta abierta, quiénes respondieron y la
+  /// tabla de posiciones.
+  QuizState get quiz => _quiz;
+
+  /// Las preguntas del concurso viven en la charla: el servidor las recibe
+  /// y es quien lleva los puntos (nadie puede hacer trampa desde el celular).
+  void loadQuiz(List<QuizQuestion> bank) {
+    _quizBank = bank;
+    if (online) _sendQuizBank();
+  }
+
+  void _sendQuizBank() {
+    if (_quizBank.isEmpty) return;
+    _send({
+      't': 'concurso',
+      'preguntas': [for (final question in _quizBank) question.toJson()],
+    });
+  }
 
   /// Las excusas que salieron en pantalla. Mientras no haya ronda, las de
   /// respaldo: así la demo de la API muestra lo mismo que se vio antes.
@@ -290,6 +311,9 @@ class LiveController extends ChangeNotifier {
     if (json['questionRound'] case final Map<String, Object?> round) {
       _questionRound = TextRound.fromJson(round, now);
     }
+    if (json['quiz'] case final Map<String, Object?> quiz) {
+      _quiz = QuizState.fromJson(quiz, now);
+    }
     final polls = json['polls'] as Map? ?? const {};
     _serverResults
       ..clear()
@@ -314,6 +338,8 @@ class LiveController extends ChangeNotifier {
       if (answer['sesion'] case final String session) _session = session;
       _access = PresenterAccess.granted;
       _loginError = null;
+      // Primero las preguntas del concurso: el cue puede abrir una.
+      _sendQuizBank();
       _send({'t': 'cue', 'cue': _cue.toJson()});
       if (_slide.isNotEmpty) _send({'t': 'diapositiva', ..._slide});
     } else {
@@ -354,7 +380,10 @@ class LiveController extends ChangeNotifier {
   void setCue(AudienceCue cue) {
     if (cue == _cue) return;
     _cue = cue;
-    if (_access == PresenterAccess.granted) _send({'t': 'cue', 'cue': cue.toJson()});
+    if (_access == PresenterAccess.granted) {
+      if (cue.mode == AudienceMode.quiz) _sendQuizBank();
+      _send({'t': 'cue', 'cue': cue.toJson()});
+    }
     if (!online) _localRounds(cue);
     notifyListeners();
   }
@@ -394,6 +423,8 @@ class LiveController extends ChangeNotifier {
         });
       case AudienceMode.excuse:
         if (_excuseRound.phase == RoundPhase.open) _closeLocalExcuses();
+      case AudienceMode.quiz:
+        _localQuiz(cue.quizPhase ?? 'intro', cue.quizIndex);
       case AudienceMode.questions:
         if (_questionRound.phase != RoundPhase.closed) return;
         _questionRound = const TextRound(phase: RoundPhase.choosing);
@@ -432,13 +463,144 @@ class LiveController extends ChangeNotifier {
   /// Vuelve a empezar las rondas locales (para ensayar otra vez).
   void resetRounds() {
     _localRound?.cancel();
+    _resetLocalQuiz();
     _excuseRound = TextRound.closed;
     _questionRound = TextRound.closed;
+    _quiz = QuizState.initial;
     _backupPicks = null;
     if (online) {
       _send({'t': 'reiniciar', 'que': 'excusas'});
       _send({'t': 'reiniciar', 'que': 'preguntas'});
+      _send({'t': 'reiniciar', 'que': 'concurso'});
     }
+    notifyListeners();
+  }
+
+  // El concurso sin servidor, para ensayar: con la tecla S juegan los
+  // asistentes de ensayo, con las mismas reglas que en el servidor.
+  int _localQuizIndex = -1;
+  DateTime? _localQuizStart;
+  Timer? _localQuizTimer;
+  final _localAnswers = <int, Map<String, (int, int)>>{};
+  final _localClosed = <int>{};
+  final _localPoints = <String, int>{};
+  Map<String, int> _localBefore = const {};
+  final _localGained = <String, int>{};
+
+  static const _quizSeconds = 30;
+
+  void _localQuiz(String phase, int? index) {
+    switch (phase) {
+      case 'pregunta' when index != null && index >= 0 && index < _quizBank.length:
+        if (_localAnswers.containsKey(index)) return;
+        _localQuizTimer?.cancel();
+        _localQuizIndex = index;
+        _localQuizStart = DateTime.now();
+        _localAnswers[index] = {};
+        _localQuizTimer = Timer.periodic(
+          const Duration(milliseconds: 300),
+          (_) => _tickLocalQuiz(),
+        );
+        _publishLocalQuiz(QuizPhase.question);
+      case 'tabla':
+        _closeLocalQuestion();
+      case 'podio':
+        _closeLocalQuestion();
+        _publishLocalQuiz(QuizPhase.podium);
+      default:
+        // La portada es la línea de salida: un concurso ya jugado (un
+        // ensayo) empieza de cero.
+        _resetLocalQuiz();
+        _publishLocalQuiz(QuizPhase.intro);
+    }
+  }
+
+  void _resetLocalQuiz() {
+    _localQuizTimer?.cancel();
+    _localQuizIndex = -1;
+    _localQuizStart = null;
+    _localAnswers.clear();
+    _localClosed.clear();
+    _localPoints.clear();
+    _localBefore = const {};
+    _localGained.clear();
+  }
+
+  void _tickLocalQuiz() {
+    final start = _localQuizStart;
+    if (_disposed || start == null) return;
+    final elapsed = DateTime.now().difference(start);
+    if (elapsed >= const Duration(seconds: _quizSeconds)) {
+      _closeLocalQuestion();
+      return;
+    }
+    final question = _quizBank[_localQuizIndex];
+    final answers = _localAnswers[_localQuizIndex]!;
+    for (final player in _localPlayers) {
+      final id = '${player.number}';
+      if (answers.containsKey(id) || _random.nextDouble() > 0.07) continue;
+      // Seis de cada diez aciertan, como en una sala que puso atención.
+      final option = _random.nextDouble() < 0.6
+          ? question.correct
+          : _random.nextInt(question.options.length);
+      answers[id] = (option, elapsed.inMilliseconds + _random.nextInt(400));
+    }
+    _publishLocalQuiz(QuizPhase.question);
+  }
+
+  void _closeLocalQuestion() {
+    final index = _localQuizIndex;
+    if (index < 0 || !_localClosed.add(index)) return;
+    _localQuizTimer?.cancel();
+    final question = _quizBank[index];
+    _localBefore = Map.of(_localPoints);
+    _localGained.clear();
+    for (final MapEntry(key: id, value: (option, ms)) in _localAnswers[index]!.entries) {
+      final share = (ms / (_quizSeconds * 1000)).clamp(0.0, 1.0);
+      final gained = option == question.correct ? (1000 * (1 - share / 2)).round() : 0;
+      _localGained[id] = gained;
+      _localPoints[id] = (_localPoints[id] ?? 0) + gained;
+    }
+    _publishLocalQuiz(QuizPhase.board);
+  }
+
+  List<Arrival> get _localPlayers => simulating ? _simulatedAttendees : const [];
+
+  void _publishLocalQuiz(QuizPhase phase) {
+    final players = {for (final player in _localPlayers) '${player.number}': player};
+    List<String> order(Map<String, int> points) => players.keys.toList()
+      ..sort((a, b) {
+        final byPoints = (points[b] ?? 0).compareTo(points[a] ?? 0);
+        return byPoints != 0 ? byPoints : players[a]!.name.compareTo(players[b]!.name);
+      });
+    final ranking = order(_localPoints);
+    final before = order(_localBefore);
+    final answers = _localAnswers[_localQuizIndex] ?? const {};
+    final question = _localQuizIndex >= 0 ? _quizBank[_localQuizIndex] : null;
+    _quiz = QuizState(
+      phase: phase,
+      index: _localQuizIndex,
+      deadline: _localQuizStart?.add(const Duration(seconds: _quizSeconds)),
+      answered: answers.length,
+      players: players.length,
+      distribution: [
+        if (question != null && phase != QuizPhase.question)
+          for (var option = 0; option < question.options.length; option++)
+            answers.values.where((answer) => answer.$1 == option).length,
+      ],
+      board: [
+        for (final (rank, id) in ranking.take(8).indexed)
+          QuizRow(
+            name: players[id]!.name,
+            widget: players[id]!.widget,
+            points: _localPoints[id] ?? 0,
+            before: _localBefore[id] ?? 0,
+            gained: _localGained[id] ?? 0,
+            rank: rank + 1,
+            rankBefore: before.indexOf(id) + 1,
+          ),
+      ],
+    );
     notifyListeners();
   }
 
@@ -530,6 +692,7 @@ class LiveController extends ChangeNotifier {
     _disposed = true;
     _simulation?.cancel();
     _localRound?.cancel();
+    _localQuizTimer?.cancel();
     _reconnect?.cancel();
     _heartbeat?.cancel();
     unawaited(_subscription?.cancel());

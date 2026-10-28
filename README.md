@@ -3,7 +3,7 @@
 Charla **«Descubriendo Flutter: Creando experiencias móviles multiplataforma»**, de Jorge Palacio (Senior Frontend Developer).
 28 de octubre de 2026, Universidad Autónoma del Caribe, Barranquilla. La organizan BAQ JUG, DevJVM, Gniem, CaribeDev e IEEE Computer Society UAC.
 
-La presentación también es una app de Flutter: 36 diapositivas en Flutter Web con votaciones en vivo desde el celular, excusas y preguntas elegidas por una IA, rayos X sobre el árbol de widgets, hot reload en vivo, la app de la demo corriendo dentro de una diapositiva, créditos de película y un toque de humor de desarrollador.
+La presentación también es una app de Flutter: 37 diapositivas en Flutter Web con votaciones en vivo desde el celular, excusas y preguntas elegidas por una IA, rayos X sobre el árbol de widgets, hot reload en vivo, la app de la demo corriendo dentro de una diapositiva, créditos de película, un concurso tipo Kahoot al final y un toque de humor de desarrollador.
 
 ## Qué hay aquí
 
@@ -23,10 +23,11 @@ La app de la demo final, EcoEats (Flutter con una API en Kotlin), vive en su pro
 ## Cómo funciona en vivo
 
 1. El público escanea el QR y escribe su nombre. Le toca un widget como apodo («Tu apodo de hoy: `Expanded()`»), con un ícono ⓘ que explica qué hace ese widget, y su llegada aparece en la terminal de la primera diapositiva. Los apodos no se repiten: 181 entre widgets y constructores con nombre (`ListView.builder`…) y, si llega más gente, `SizedBox(height: N)`. Si el servidor se reinicia, cada celular recupera el suyo.
-2. Cada diapositiva le dice al servidor qué mostrar en los celulares: una votación, el contador, la ronda de excusas (un minuto, con cuenta regresiva), las preguntas, los créditos o la calificación.
+2. Cada diapositiva le dice al servidor qué mostrar en los celulares: una votación, el contador, la ronda de excusas (un minuto, con cuenta regresiva), las preguntas, los créditos, el concurso o la calificación.
 3. Las excusas y las preguntas las escoge Gemini en el servidor: las excusas más populares, graciosas y raras; cinco preguntas que cubran las dudas sin repetirse, sin editarlas. Si la IA falla o nadie escribe, hay plan B (con excusas de respaldo, costeñas).
 4. Los resultados vuelven a la presentación en tiempo real. `GET /excusas` responde las excusas elegidas: es el contrato real de la diapositiva de la API.
-5. Sin internet, la charla sigue funcionando: las votaciones pasan a mano alzada con las teclas 1–9 y las rondas usan el plan B.
+5. Al final, un concurso tipo Kahoot: 10 preguntas sobre la charla, 30 segundos cada una. Acertar da de 1000 puntos (al instante) a 500 (en el último segundo); fallar, 0. Después de cada pregunta, la tabla de posiciones animada; al final, el podio de los tres primeros. Arranca con «Comenzar», en la charla o en `/moderar/`.
+6. Sin internet, la charla sigue funcionando: las votaciones pasan a mano alzada con las teclas 1–9 y las rondas usan el plan B.
 
 **Modo presentador.** Solo quien tiene el token maneja los celulares.
 - **Login:** la presentación y la página `/moderar/` lo piden en una pantalla de login. Viaja dentro del WebSocket cifrado, nunca en la URL.

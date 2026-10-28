@@ -23,6 +23,7 @@
     .cifra b { display: block; font: 600 26px var(--mono); }
     .cifra span { font: 500 12px var(--mono); color: var(--faint); }
     #acceso { display: grid; gap: 10px; }
+    #acceso[hidden] { display: none; }
     .ahora { padding: 18px 18px 8px; border: 1.5px solid var(--sky); border-radius: 16px; background: var(--surface); }
     .ahora .donde { font: 600 13px var(--mono); color: var(--sky-text); letter-spacing: .04em; }
     .ahora h2 { margin: 6px 0 4px; font-size: 24px; }
@@ -67,6 +68,7 @@
         <button class="adelante" id="adelante" type="button">Siguiente →</button>
       </div>
       <p class="despues" id="despues"></p>
+      <p class="despues" id="concurso"></p>
       <div class="cifras" style="margin-top:18px">
         <div class="cifra"><b id="conectados">0</b><span>conectados</span></div>
         <div class="cifra"><b id="contador">0</b><span>toques</span></div>
@@ -229,6 +231,14 @@
         }));
         const siguiente = guion[indice + 1];
         $('despues').textContent = siguiente ? `Después: ${siguiente.titulo}` : '';
+        // En el concurso, el botón de avanzar dice qué va a pasar.
+        const paso = diapositiva.paso;
+        $('adelante').textContent = diapositiva.id !== 'concurso' ? 'Siguiente →'
+          : paso === 1 ? '▶ Comenzar el concurso'
+          : paso === diapositiva.pasos ? 'Siguiente →'
+          : paso === diapositiva.pasos - 1 ? 'Ver el podio 🏆'
+          : paso % 2 === 0 ? 'Cerrar la pregunta'
+          : 'Siguiente pregunta →';
       }
 
       $('adelante').addEventListener('click', () => {
@@ -239,6 +249,12 @@
 
       function pintar(estado) {
         pintarGuion(estado.slide);
+        const concurso = estado.quiz || {};
+        $('concurso').textContent = estado.slide && estado.slide.id === 'concurso'
+          ? (concurso.phase === 'pregunta'
+            ? `Pregunta ${concurso.index + 1}/${concurso.total} · ${concurso.answered} de ${concurso.players} respondieron`
+            : `Concurso · ${concurso.players || 0} ${concurso.players === 1 ? 'jugador conectado' : 'jugadores conectados'}`)
+          : '';
         $('conectados').textContent = estado.connected;
         $('contador').textContent = estado.counter;
         $('estrellas').textContent = estado.rating.total ? estado.rating.average.toFixed(1) : '–';

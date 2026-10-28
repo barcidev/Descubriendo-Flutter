@@ -1,7 +1,7 @@
 import 'package:flutter/foundation.dart';
 
 /// Lo que ve el celular del público en cada momento.
-enum AudienceMode { idle, poll, counter, excuse, questions, rating, credits, crash }
+enum AudienceMode { idle, poll, counter, excuse, questions, rating, credits, crash, quiz }
 
 @immutable
 class PollOption {
@@ -69,12 +69,19 @@ class AudienceCue {
   const AudienceCue.crash({bool fixed = false})
     : this._(AudienceMode.crash, revealed: fixed);
 
+  /// El concurso del final: [phase] es `intro`, `pregunta`, `tabla` o
+  /// `podio`, y [index] la pregunta.
+  const AudienceCue.quiz(String phase, {int? index})
+    : this._(AudienceMode.quiz, quizPhase: phase, quizIndex: index);
+
   const AudienceCue._(
     this.mode, {
     this.poll,
     this.open = false,
     this.revealed = false,
     this.seconds,
+    this.quizPhase,
+    this.quizIndex,
   });
 
   final AudienceMode mode;
@@ -89,12 +96,17 @@ class AudienceCue {
   /// Cuánto dura la ronda de excusas.
   final int? seconds;
 
+  final String? quizPhase;
+  final int? quizIndex;
+
   Map<String, Object?> toJson() => {
     'mode': mode.name,
     if (poll != null) 'poll': poll!.toJson(),
     'open': open,
     'revealed': revealed,
     if (seconds != null) 'seconds': seconds,
+    'phase': ?quizPhase,
+    'index': ?quizIndex,
     if (revealed && poll != null)
       'correct': [
         for (final option in poll!.options)
@@ -108,10 +120,12 @@ class AudienceCue {
       other.mode == mode &&
       other.poll?.id == poll?.id &&
       other.open == open &&
-      other.revealed == revealed;
+      other.revealed == revealed &&
+      other.quizPhase == quizPhase &&
+      other.quizIndex == quizIndex;
 
   @override
-  int get hashCode => Object.hash(mode, poll?.id, open, revealed);
+  int get hashCode => Object.hash(mode, poll?.id, open, revealed, quizPhase, quizIndex);
 }
 
 /// Los votos de una encuesta: cuántas personas votaron y cuántas marcaron
@@ -159,6 +173,111 @@ class PollResults {
 /// El apodo escrito como llamada: `Expanded()`. Los que ya traen paréntesis,
 /// como `SizedBox(height: 182)`, quedan igual.
 String asCall(String widget) => widget.endsWith(')') ? widget : '$widget()';
+
+/// Una pregunta del concurso: viven en la charla y se le mandan al servidor,
+/// que es quien lleva los puntos.
+@immutable
+class QuizQuestion {
+  const QuizQuestion(this.text, this.options, this.correct);
+
+  final String text;
+  final List<String> options;
+  final int correct;
+
+  Map<String, Object?> toJson() => {'texto': text, 'opciones': options, 'correcta': correct};
+}
+
+enum QuizPhase { intro, question, board, podium }
+
+/// Una fila de la tabla de posiciones, con el puesto y los puntos de antes
+/// de la última pregunta: así se anima quién sube.
+@immutable
+class QuizRow {
+  const QuizRow({
+    required this.name,
+    required this.widget,
+    required this.points,
+    required this.before,
+    required this.gained,
+    required this.rank,
+    required this.rankBefore,
+  });
+
+  final String name;
+  final String widget;
+  final int points;
+  final int before;
+  final int gained;
+  final int rank;
+  final int rankBefore;
+
+  static QuizRow fromJson(Map<String, Object?> json) => QuizRow(
+    name: json['name'] as String? ?? '',
+    widget: json['widget'] as String? ?? 'Widget',
+    points: (json['points'] as num? ?? 0).toInt(),
+    before: (json['before'] as num? ?? 0).toInt(),
+    gained: (json['gained'] as num? ?? 0).toInt(),
+    rank: (json['rank'] as num? ?? 0).toInt(),
+    rankBefore: (json['rankBefore'] as num? ?? 0).toInt(),
+  );
+}
+
+/// Cómo va el concurso según el servidor (o el ensayo sin servidor).
+@immutable
+class QuizState {
+  const QuizState({
+    this.phase = QuizPhase.intro,
+    this.index = -1,
+    this.deadline,
+    this.answered = 0,
+    this.players = 0,
+    this.distribution = const [],
+    this.board = const [],
+  });
+
+  static const initial = QuizState();
+
+  final QuizPhase phase;
+  final int index;
+
+  /// Cuándo se cierra la pregunta abierta, en la hora de esta máquina.
+  final DateTime? deadline;
+  final int answered;
+  final int players;
+
+  /// Cuántos escogieron cada opción, cuando la pregunta ya se cerró.
+  final List<int> distribution;
+  final List<QuizRow> board;
+
+  Duration remaining(DateTime now) {
+    final end = deadline;
+    if (phase != QuizPhase.question || end == null || !end.isAfter(now)) return Duration.zero;
+    return end.difference(now);
+  }
+
+  static QuizState fromJson(Map<String, Object?> json, DateTime now) {
+    final remaining = (json['remaining'] as num? ?? 0).toDouble();
+    return QuizState(
+      phase: switch (json['phase']) {
+        'pregunta' => QuizPhase.question,
+        'tabla' => QuizPhase.board,
+        'podio' => QuizPhase.podium,
+        _ => QuizPhase.intro,
+      },
+      index: (json['index'] as num? ?? -1).toInt(),
+      deadline: now.add(Duration(milliseconds: (remaining * 1000).round())),
+      answered: (json['answered'] as num? ?? 0).toInt(),
+      players: (json['players'] as num? ?? 0).toInt(),
+      distribution: [
+        for (final count in (json['distribution'] as List? ?? const [])) (count as num).toInt(),
+      ],
+      board: [
+        for (final row in (json['board'] as List? ?? const []))
+          if (row case final Map<String, Object?> map) QuizRow.fromJson(map),
+      ],
+    );
+  }
+}
 
 /// Alguien que acaba de escribir su nombre en el celular.
 @immutable

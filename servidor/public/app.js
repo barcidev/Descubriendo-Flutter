@@ -34,6 +34,9 @@
   const borrador = leer('charla.borradores', {});
   // Cuándo se cierra la ronda de excusas, en la hora de este celular.
   let finExcusas = 0;
+  // El concurso: cuándo se cierra la pregunta y cómo le va a esta persona.
+  let finPregunta = 0;
+  let miConcurso = null;
 
   // ---------- Conexión ----------
 
@@ -54,10 +57,18 @@
         $('notaNombre').textContent = 'Ese nombre no pasó el linter. Prueba con otro.';
         $('formNombre').querySelector('button').disabled = false;
       }
+      if (mensaje.t === 'concurso-mio') {
+        miConcurso = mensaje;
+        if (estado) { modoPintado = ''; pintar(); }
+      }
       if (mensaje.t === 'estado') {
         estado = mensaje;
         const ronda = estado.excuseRound || {};
         finExcusas = ronda.phase === 'abierta' ? Date.now() + ronda.remaining * 1000 : 0;
+        const concurso = estado.quiz || {};
+        finPregunta = concurso.phase === 'pregunta' ? Date.now() + concurso.remaining * 1000 : 0;
+        // En la portada del concurso empieza un juego nuevo: lo de antes no cuenta.
+        if (concurso.phase === 'intro') miConcurso = null;
         pintar();
       }
     };
@@ -163,7 +174,9 @@
     if (!miNombre || $('yo').hidden) return;
     const cue = estado.cue || { mode: 'idle' };
     // La pantalla roja se vuelve a pintar cuando se «arregla».
-    const clave = cue.mode + (cue.poll ? cue.poll.id : '') + (cue.mode === 'crash' ? String(cue.revealed) : '');
+    const concurso = estado.quiz || {};
+    const clave = cue.mode + (cue.poll ? cue.poll.id : '') + (cue.mode === 'crash' ? String(cue.revealed) : '') +
+      (cue.mode === 'quiz' ? `${concurso.phase}-${concurso.index}` : '');
     // Si la pantalla es la misma, solo se actualizan los números: así no se
     // pierde lo que la persona está escribiendo.
     if (clave === modoPintado && actualizar(cue)) return;
@@ -178,6 +191,7 @@
       case 'rating': pintarEstrellas(pantalla); break;
       case 'credits': pintarCreditos(pantalla); break;
       case 'crash': pintarError(pantalla, cue); break;
+      case 'quiz': pintarConcurso(pantalla, concurso); break;
       default: pintarEspera(pantalla);
     }
   }
@@ -187,6 +201,7 @@
     if (cue.mode === 'poll') { pintarResultados(cue); return true; }
     if (cue.mode === 'counter') { $('total').textContent = estado.counter; return true; }
     if (cue.mode === 'excuse') { relojExcusas(); return true; }
+    if (cue.mode === 'quiz') { relojConcurso(); return true; }
     return ['rating', 'questions', 'credits', 'idle', 'crash'].includes(cue.mode);
   }
 
@@ -398,6 +413,100 @@
     }
     pantalla.append(caja);
   }
+
+  // ---------- El concurso (tipo Kahoot) ----------
+
+  // Los cuatro colores y figuras de siempre: triángulo, rombo, círculo y cuadrado.
+  const FIGURAS = [
+    { color: '#e21b3c', svg: '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3 22 20H2z"/></svg>' },
+    { color: '#1368ce', svg: '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 2 22 12 12 22 2 12z"/></svg>' },
+    { color: '#d89e00', svg: '<svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="10"/></svg>' },
+    { color: '#26890c', svg: '<svg viewBox="0 0 24 24" aria-hidden="true"><rect x="3" y="3" width="18" height="18" rx="2"/></svg>' },
+  ];
+
+  function figura(i) {
+    const nodo = el('span', 'figura');
+    nodo.innerHTML = FIGURAS[i].svg; // marcado fijo, no texto del público
+    return nodo;
+  }
+
+  function puntos(n) { return Number(n || 0).toLocaleString('es-CO'); }
+
+  function pintarConcurso(pantalla, concurso) {
+    const caja = el('div', 'concurso');
+    const mio = miConcurso && miConcurso.index === concurso.index ? miConcurso : null;
+    if (concurso.phase === 'intro' || concurso.index < 0) {
+      caja.append(
+        el('p', 'etiqueta', 'Concurso final'),
+        el('h2', null, '¿Quién estuvo pilas?'),
+        el('p', 'ayuda', `${concurso.total || 10} preguntas sobre la charla, 30 segundos cada una. Si aciertas ganas hasta 1000 puntos: entre más rápido, más.`),
+        el('p', 'nota', 'Espera: empieza en la pantalla.'),
+      );
+    } else if (concurso.phase === 'pregunta') {
+      const reloj = el('p', 'reloj', '');
+      reloj.id = 'relojConcurso';
+      caja.append(
+        el('p', 'etiqueta', `Pregunta ${concurso.index + 1} de ${concurso.total}`),
+        reloj,
+        el('h2', null, concurso.question || ''),
+      );
+      const opciones = el('div', 'opciones-concurso');
+      const respondida = mio && mio.answer != null;
+      (concurso.options || []).forEach((texto, i) => {
+        const boton = el('button', 'opcion-concurso');
+        boton.type = 'button';
+        boton.style.background = FIGURAS[i].color;
+        boton.append(figura(i), el('span', null, texto));
+        boton.disabled = respondida;
+        if (respondida && mio.answer === i) boton.classList.add('elegida');
+        boton.addEventListener('click', () => {
+          enviar({ t: 'respuesta', index: concurso.index, opcion: i });
+          if (navigator.vibrate) navigator.vibrate(12);
+          for (const otro of opciones.children) otro.disabled = true;
+          boton.classList.add('elegida');
+          nota.textContent = '¡Listo! Espera el resultado.';
+        });
+        opciones.append(boton);
+      });
+      const nota = el('p', 'nota', respondida ? '¡Listo! Espera el resultado.' : 'Toca tu respuesta. Más rápido, más puntos.');
+      caja.append(opciones, nota);
+    } else {
+      const correcta = concurso.correct;
+      const final = concurso.phase === 'podio';
+      if (!final && correcta != null && concurso.options) {
+        const linea = el('p', 'correcta-concurso');
+        linea.style.background = FIGURAS[correcta].color;
+        linea.append(figura(correcta), el('span', null, concurso.options[correcta]));
+        caja.append(el('p', 'etiqueta', `Pregunta ${concurso.index + 1}: la respuesta era`), linea);
+      }
+      if (final) {
+        const medallas = ['', '🥇', '🥈', '🥉'];
+        caja.append(
+          el('p', 'etiqueta', 'Fin del concurso'),
+          el('h2', 'puesto-final', miConcurso && miConcurso.rank ? `Quedaste #${miConcurso.rank} ${medallas[miConcurso.rank] || ''}` : 'Mira la pantalla'),
+        );
+      } else if (mio) {
+        const acerto = (mio.gained || 0) > 0;
+        caja.append(el('h2', acerto ? 'bien' : 'mal',
+          mio.answer == null ? 'No alcanzaste a responder' : acerto ? `¡Correcto! +${puntos(mio.gained)}` : 'Esta no era'));
+      }
+      if (miConcurso && miConcurso.rank) {
+        caja.append(el('p', 'ayuda', `Vas #${miConcurso.rank} de ${miConcurso.players} · ${puntos(miConcurso.points)} puntos`));
+      }
+      caja.append(el('p', 'nota', final ? '¡Mira el podio en la pantalla!' : 'Mira la tabla en la pantalla.'));
+    }
+    pantalla.append(caja);
+    relojConcurso();
+  }
+
+  function relojConcurso() {
+    const reloj = $('relojConcurso');
+    if (!reloj) return;
+    const falta = Math.max(0, Math.ceil((finPregunta - Date.now()) / 1000));
+    reloj.classList.toggle('fin', falta === 0);
+    reloj.textContent = falta > 0 ? `0:${String(falta).padStart(2, '0')}` : 'Tiempo';
+  }
+  setInterval(relojConcurso, 250);
 
   function pintarCreditos(pantalla) {
     pantalla.append(

@@ -170,8 +170,15 @@ Teclas: → siguiente · ← anterior · Q QR gigante · X rayos X · T tema · 
 ## creditos · Los créditos · 1 min (sección)
 - Pantalla completa, como en el cine: la charla en números, el elenco (el público con su nombre y su apodo), los organizadores y tu foto.
 - Escena post-créditos: «¿Creyeron que todo esto eran diapositivas? Era un mock: N widgets haciéndose pasar por PowerPoint.» Un mock es lo que en los tests se hace pasar por otra cosa: eso eran las diapositivas.
-- Cinco segundos después, el Mac trae al frente el simulador (con presentar.sh) y la charla pasa sola al cierre. Muestra la app de verdad.
+- Cinco segundos después, el Mac trae al frente Antigravity y el simulador (con presentar.sh) y la charla pasa sola al concurso. Muestra la app de verdad y vuelve con Cmd+Tab.
 - Sin presentar.sh, la charla sale de pantalla completa: cambia al simulador con Cmd+Tab.
+## concurso · Concurso final · 5 min
+- Al volver del simulador del Mac (Cmd+Tab), la charla espera aquí: las reglas y el botón «Comenzar». También lo tienes en este celular.
+- 10 preguntas sobre la charla, 30 segundos cada una. Acertar da de 1000 puntos (al instante) a 500 (al final); fallar, 0. Juega quien dio su nombre.
+- La pregunta se cierra sola a los 30 s o cuando todos respondieron, y la charla pasa sola a la respuesta y la tabla. Un clic adelanta el cierre.
+- En la tabla, un clic abre la siguiente pregunta. Después de la décima, el podio: suben el tercero, el segundo y, con redoble, el ganador.
+- Lee la pregunta en voz alta y haz barra: «¡quedan diez segundos!».
+
 ## application-finished · Application finished.
 - Al volver del simulador ya está aquí: gracias, la calificación en vivo («Califiquen el deploy»), el QR de la guía oficial para empezar mañana y los organizadores.
 - Deja esta diapositiva mientras sales.

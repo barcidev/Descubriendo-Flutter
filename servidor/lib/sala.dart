@@ -3,6 +3,7 @@ import 'dart:convert';
 import 'dart:io' show stdout;
 import 'dart:math' as math;
 
+import 'concurso.dart';
 import 'filtro.dart';
 import 'jurado.dart';
 import 'personas.dart';
@@ -111,6 +112,7 @@ const _modos = {
   'rating',
   'credits',
   'crash',
+  'quiz',
 };
 const _reaccionesValidas = {'fuego', 'bug', 'aplauso'};
 final _idValido = RegExp(r'^[A-Za-z0-9_-]{8,64}$');
@@ -122,7 +124,8 @@ class Sala {
   Sala({math.Random? azar, Reloj? reloj, Jurado? jurado})
       : _azar = azar ?? math.Random(),
         _reloj = reloj ?? DateTime.now,
-        _jurado = jurado;
+        _jurado = jurado,
+        _concurso = Concurso(reloj: reloj);
 
   final math.Random _azar;
   final Reloj _reloj;
@@ -141,6 +144,7 @@ class Sala {
   final _opciones = <String, List<String>>{};
   final _multiple = <String, bool>{};
   int _contador = 0;
+  final Concurso _concurso;
   final _excusas = RondaDeTextos(Ronda.excusas);
   final _preguntas = RondaDeTextos(Ronda.preguntas);
   final _estrellas = <String, int>{};
@@ -167,6 +171,7 @@ class Sala {
   String get modo => _cue['mode']! as String;
 
   RondaDeTextos get excusas => _excusas;
+  Concurso get concurso => _concurso;
   RondaDeTextos get preguntas => _preguntas;
 
   void entrar(Conexion conexion) {
@@ -220,6 +225,11 @@ class Sala {
         !_reloj().isBefore(_excusas.cierre!)) {
       unawaited(_elegir(_excusas));
     }
+    // La pregunta del concurso se cierra a los 30 s o cuando todos respondieron.
+    if (_concurso.fase == FaseConcurso.pregunta &&
+        (_concurso.vencida || _todosRespondieron)) {
+      _cerrarPregunta();
+    }
     final reacciones = Map.of(_reacciones);
     final hayReacciones = reacciones.values.any((n) => n > 0);
     if (!_cambio && !hayReacciones) return;
@@ -252,6 +262,9 @@ class Sala {
       if (asistente.nombre == null) _bautizar(asistente, json['nombre']);
       _presentarse(conexion, asistente);
       conexion.enviar(jsonEncode(_estadoPublico()));
+      if (_concurso.indice >= 0) {
+        conexion.enviar(jsonEncode({'t': 'concurso-mio', ..._resultadoDe(id)}));
+      }
       _cambio = true;
       return;
     }
@@ -267,6 +280,14 @@ class Sala {
         }
       case 'voto':
         _votar(cliente, json);
+      case 'respuesta':
+        // En el concurso juega quien dio su nombre.
+        if (_asistentes[cliente]?.nombre == null) return;
+        if (_concurso.responder(cliente, json['index'], json['opcion'])) {
+          conexion.enviar(
+              jsonEncode({'t': 'concurso-mio', ..._resultadoDe(cliente)}));
+          _cambio = true;
+        }
       case 'toque':
         final cantidad = json['n'];
         if (modo == 'counter' &&
@@ -490,6 +511,16 @@ class Sala {
         _cue = cue;
         _rondas(cue);
         _cambio = true;
+      case 'concurso':
+        // Las preguntas viven en la charla; se cambian solo antes de jugar.
+        final preguntas = [
+          for (final pregunta in (json['preguntas'] as List?) ?? const [])
+            if (PreguntaConcurso.deJson(pregunta) case final valida?) valida,
+        ];
+        if (preguntas.isNotEmpty && _concurso.respuestas.isEmpty) {
+          _concurso.preguntas = preguntas;
+          _cambio = true;
+        }
       case 'quitar':
         // Por si el jurado deja pasar algo que no debe salir en pantalla.
         final ronda = json['tipo'] == 'pregunta' ? _preguntas : _excusas;
@@ -542,6 +573,8 @@ class Sala {
             _reiniciar(_excusas);
           case 'preguntas':
             _reiniciar(_preguntas);
+          case 'concurso':
+            _concurso.reiniciar();
         }
         _cambio = true;
     }
@@ -565,7 +598,130 @@ class Sala {
         if (_excusas.fase == Fase.abierta) unawaited(_elegir(_excusas));
       case 'questions':
         if (_preguntas.fase == Fase.cerrada) unawaited(_elegir(_preguntas));
+      case 'quiz':
+        // La charla avanza el concurso paso a paso: abre cada pregunta, la
+        // cierra (si nadie la cerró antes) y al final pide el podio.
+        final indice = cue['index'];
+        switch (cue['phase']) {
+          case 'intro':
+            // La portada es la línea de salida: si quedó un concurso jugado
+            // (un ensayo en este mismo servidor), se empieza de cero.
+            _concurso.reiniciar();
+          case 'pregunta' when indice is int:
+            _concurso.abrir(indice);
+          case 'tabla':
+            _cerrarPregunta();
+          case 'podio':
+            _cerrarPregunta();
+            _concurso.terminar();
+            _avisarConcurso();
+        }
     }
+  }
+
+  /// Quienes juegan: los que dieron su nombre, con su nombre.
+  Map<String, String> _jugadores() => {
+        for (final MapEntry(key: cliente, value: asistente)
+            in _asistentes.entries)
+          if (asistente.nombre case final nombre?) cliente: nombre,
+      };
+
+  bool get _todosRespondieron {
+    final conectados = {
+      for (final conexion in _audiencia)
+        if (conexion.cliente case final cliente?
+            when _asistentes[cliente]?.nombre != null)
+          cliente,
+    };
+    final respondieron = _concurso.respuestas[_concurso.indice] ?? const {};
+    return conectados.isNotEmpty && conectados.every(respondieron.containsKey);
+  }
+
+  void _cerrarPregunta() {
+    if (_concurso.fase != FaseConcurso.pregunta) return;
+    _concurso.cerrar();
+    _avisarConcurso();
+    _cambio = true;
+  }
+
+  /// A cada celular, cómo le fue: si acertó, cuánto ganó y en qué puesto va.
+  void _avisarConcurso() {
+    for (final conexion in _audiencia) {
+      final cliente = conexion.cliente;
+      if (cliente == null || _asistentes[cliente]?.nombre == null) continue;
+      conexion.enviar(jsonEncode({'t': 'concurso-mio', ..._resultadoDe(cliente)}));
+    }
+  }
+
+  Map<String, Object?> _resultadoDe(String cliente) {
+    final orden = Concurso.ordenar(_concurso.puntos, _jugadores());
+    final respuesta = _concurso.respuestas[_concurso.indice]?[cliente];
+    return {
+      'phase': _concurso.fase.name,
+      'index': _concurso.indice,
+      'answer': respuesta?.opcion,
+      if (_concurso.fase != FaseConcurso.pregunta)
+        'gained': _concurso.ganados[cliente] ?? 0,
+      'points': _concurso.puntos[cliente] ?? 0,
+      'rank': orden.indexOf(cliente) + 1,
+      'players': orden.length,
+    };
+  }
+
+  /// El concurso para el celular: la pregunta y sus opciones, sin decir
+  /// cuál es la correcta hasta que se cierre.
+  Map<String, Object?> _concursoPublico() {
+    final pregunta = _concurso.actual;
+    final cerrada = _concurso.fase != FaseConcurso.pregunta;
+    return {
+      'phase': _concurso.fase.name,
+      'index': _concurso.indice,
+      'total': _concurso.preguntas.length,
+      'remaining': _concurso.restante.inMilliseconds / 1000,
+      if (pregunta != null) ...{
+        'question': pregunta.texto,
+        'options': pregunta.opciones,
+        if (cerrada) 'correct': pregunta.correcta,
+      },
+    };
+  }
+
+  /// Para la charla: además, cuántos respondieron, el reparto de las
+  /// respuestas y la tabla de posiciones (con el puesto anterior, para
+  /// animar quién sube y quién baja).
+  Map<String, Object?> _concursoPresentador() {
+    final jugadores = _jugadores();
+    final ahora = Concurso.ordenar(_concurso.puntos, jugadores);
+    final antes = Concurso.ordenar(_concurso.antes, jugadores);
+    final pregunta = _concurso.actual;
+    final respuestas = _concurso.respuestas[_concurso.indice] ?? const {};
+    return {
+      ..._concursoPublico(),
+      'answered': respuestas.length,
+      'players': {
+        for (final conexion in _audiencia)
+          if (conexion.cliente case final cliente?
+              when jugadores.containsKey(cliente))
+            cliente,
+      }.length,
+      if (pregunta != null && _concurso.fase != FaseConcurso.pregunta)
+        'distribution': [
+          for (var i = 0; i < pregunta.opciones.length; i++)
+            respuestas.values.where((r) => r.opcion == i).length,
+        ],
+      'board': [
+        for (final (puesto, cliente) in ahora.take(8).indexed)
+          {
+            'name': jugadores[cliente],
+            'widget': _asistentes[cliente]!.persona.widget,
+            'points': _concurso.puntos[cliente] ?? 0,
+            'before': _concurso.antes[cliente] ?? 0,
+            'gained': _concurso.ganados[cliente] ?? 0,
+            'rank': puesto + 1,
+            'rankBefore': antes.indexOf(cliente) + 1,
+          },
+      ],
+    };
   }
 
   void _reiniciar(RondaDeTextos ronda) {
@@ -633,6 +789,7 @@ class Sala {
       if (id is String) 'results': _resultados(id),
       'excuseRound': _ronda(_excusas),
       'rating': _estrellasResumen(),
+      if (modo == 'quiz') 'quiz': _concursoPublico(),
     };
   }
 
@@ -646,6 +803,7 @@ class Sala {
         'polls': {for (final id in _votos.keys) id: _resultados(id)},
         'excuseRound': _ronda(_excusas, completa: true),
         'questionRound': _ronda(_preguntas, completa: true),
+        'quiz': _concursoPresentador(),
         'rating': _estrellasResumen(distribucion: true),
         'reactions': reacciones,
         'slide': _diapositiva,

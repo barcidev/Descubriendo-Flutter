@@ -7,7 +7,8 @@
 # Sin argumentos abre en modo mano alzada (sin servidor).
 #
 # El servidor local sirve la charla, EcoEats web (/ecoeats/) con su API, y
-# al final de los créditos trae al frente el simulador (DEMO_APPS).
+# al final de los créditos trae al frente Antigravity y el simulador
+# (otras apps: DEMO_APPS="App,Otra App" ./presentar.sh …).
 # La primera vez en ese perfil hay que escribir el token del presentador e
 # iniciar sesión en EcoEats: quedan guardados para el ensayo y la charla.
 cd "$(dirname "$0")/servidor" || exit 1

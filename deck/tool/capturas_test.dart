@@ -37,6 +37,12 @@ const _everyStep = {
 /// con lo normal: la terminal de la demo tarda en «compilar».
 const _longer = {'doctor': 12000, 'demo': 9000, 'creditos': 4000};
 
+/// Diapositivas largas de las que solo se capturan algunos pasos (y con
+/// más espera, para que terminen sus animaciones).
+const _someSteps = {
+  'concurso': {0, 1, 2, 21},
+};
+
 /// Esperas en tiempo real: estas diapositivas miden con el reloj de verdad.
 const _realWait = {'excusometro-en-vivo': 3600, 'preguntas': 10500};
 
@@ -130,6 +136,15 @@ void main() {
       for (var step = 0; step < slide.steps; step++) {
         if (step > 0) await _key(tester, LogicalKeyboardKey.arrowRight);
         final last = step == slide.steps - 1;
+        if (_someSteps[slide.id] case final steps?) {
+          if (steps.contains(step)) {
+            await _wait(tester, 7000);
+            await _shot(tester, '$number-${slide.id}-paso-${step + 1}');
+          } else {
+            await _wait(tester, 300);
+          }
+          continue;
+        }
         if (!last && !_everyStep.contains(slide.id)) {
           await _wait(tester, 300);
           continue;
