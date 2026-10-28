@@ -1,4 +1,5 @@
 import 'package:flutter/foundation.dart';
+import 'package:flutter/painting.dart' show Rect;
 
 import 'browser_stub.dart' if (dart.library.js_interop) 'browser_web.dart'
     as platform;
@@ -31,6 +32,16 @@ abstract interface class Browser {
   /// traiga al frente el IDE y el simulador del Mac. Si no hay servidor
   /// local, sale de pantalla completa para cambiar de app a mano.
   Future<bool> showDemoApps();
+
+  /// Carga una app web (la demo) en un iframe escondido apenas abre la
+  /// charla: cuando llegue su diapositiva ya arrancó, sin pantalla en blanco.
+  /// Dentro de la app el mouse funciona como un dedo, y el PgDn y el PgUp
+  /// del control remoto llegan a [onNext] y [onPrevious].
+  void preloadApp(String path, {required VoidCallback onNext, required VoidCallback onPrevious});
+
+  /// Pone la app precargada sobre [rect], en píxeles de la ventana, o la
+  /// esconde (sin cerrarla) si es null.
+  void placeApp(Rect? rect);
 
   MessageChannel channel(String name);
 }

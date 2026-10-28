@@ -110,6 +110,7 @@ const _modos = {
   'questions',
   'rating',
   'credits',
+  'crash',
 };
 const _reaccionesValidas = {'fuego', 'bug', 'aplauso'};
 final _idValido = RegExp(r'^[A-Za-z0-9_-]{8,64}$');
@@ -246,7 +247,7 @@ class Sala {
       final id = json['id'];
       if (id is! String || !_idValido.hasMatch(id)) return;
       conexion.cliente = id;
-      final asistente = _asistentes.putIfAbsent(id, _nuevoAsistente);
+      final asistente = _asistentes[id] ??= _nuevoAsistente(json['widget']);
       // Si el servidor se reinició, el celular trae el nombre guardado.
       if (asistente.nombre == null) _bautizar(asistente, json['nombre']);
       _presentarse(conexion, asistente);
@@ -281,9 +282,11 @@ class Sala {
             _reloj().isBefore(_excusas.cierre!);
         if (!abierta) return;
         _escribir(_excusas, cliente, json['texto'], maximo: 140, porPersona: 3);
+        conexion.enviar(jsonEncode({'t': 'mios', ..._historial(cliente)}));
       case 'pregunta':
         _escribir(_preguntas, cliente, json['texto'],
             maximo: 200, porPersona: 5);
+        conexion.enviar(jsonEncode({'t': 'mios', ..._historial(cliente)}));
       case 'reaccion':
         final reaccion = json['r'];
         if (reaccion is String &&
@@ -303,18 +306,30 @@ class Sala {
     }
   }
 
-  /// El widget menos repetido hasta ahora, para que haya variedad de apodos.
-  Asistente _nuevoAsistente() {
-    final usos = {for (final persona in personas) persona.widget: 0};
-    for (final asistente in _asistentes.values) {
-      usos[asistente.persona.widget] = usos[asistente.persona.widget]! + 1;
+  /// Un apodo que nadie más tenga: primero los widgets de la lista, después
+  /// las variantes y, si todo se acabó, un SizedBox con su propia altura. Si
+  /// el celular ya traía uno (porque el servidor se reinició) y sigue libre,
+  /// se lo devuelve.
+  Asistente _nuevoAsistente([Object? anterior]) {
+    final usados = {
+      for (final asistente in _asistentes.values) asistente.persona.widget,
+    };
+    final suyo = personaDe(anterior);
+    if (suyo != null && !usados.contains(suyo.widget)) return Asistente(suyo);
+    for (final grupo in const [personas, variantes]) {
+      final libres = [
+        for (final persona in grupo)
+          if (!usados.contains(persona.widget)) persona,
+      ];
+      if (libres.isNotEmpty) {
+        return Asistente(libres[_azar.nextInt(libres.length)]);
+      }
     }
-    final menos = usos.values.reduce(math.min);
-    final libres = [
-      for (final persona in personas)
-        if (usos[persona.widget] == menos) persona,
-    ];
-    return Asistente(libres[_azar.nextInt(libres.length)]);
+    var altura = _asistentes.length + 1;
+    while (usados.contains(sizedBoxDe(altura).widget)) {
+      altura++;
+    }
+    return Asistente(sizedBoxDe(altura));
   }
 
   /// Guarda el nombre si sirve. La primera vez, avisa en la terminal.
@@ -346,9 +361,23 @@ class Sala {
           for (final MapEntry(:key, :value) in _votos.entries)
             if (value[id] case final elegidas?) key: elegidas,
         },
+        ..._historial(id),
       }),
     );
   }
+
+  /// Lo que esta persona ya mandó: así, al recargar la página, lo ve igual.
+  Map<String, Object?> _historial(String cliente) => {
+        'excusas': [
+          for (final texto in _excusas.textos)
+            if (texto.cliente == cliente) texto.texto,
+        ],
+        'preguntas': [
+          for (final texto in _preguntas.textos)
+            if (texto.cliente == cliente) texto.texto,
+        ],
+        if (_estrellas[cliente] case final estrellas?) 'estrellas': estrellas,
+      };
 
   void _votar(String cliente, Map<String, Object?> json) {
     final poll = _cue['poll'];

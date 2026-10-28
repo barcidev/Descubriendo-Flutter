@@ -24,6 +24,10 @@ fvm flutter create --platforms=web --project-name ecoeats .
 # flutter_native_splash quita su splash con una función de JS que solo existe
 # si se genera el splash para web: aquí basta con que exista.
 perl -0pi -e 's#</head>#  <script>window.removeSplashFromWeb = function () {};</script>\n</head>#' web/index.html
+# Dentro de la charla la app se carga escondida (iframe inert): mientras
+# tanto no puede llevarse el foco, que es del teclado de la charla.
+perl -0pi -e 's#</head>#  <script>(function () { var foco = HTMLElement.prototype.focus; HTMLElement.prototype.focus = function () { if (window.frameElement \&\& window.frameElement.inert) return; return foco.apply(this, arguments); }; var ventana = window.focus; window.focus = function () { if (window.frameElement \&\& window.frameElement.inert) return; return ventana.apply(window, arguments); }; })();</script>\n</head>#' web/index.html
+grep -q 'frameElement.inert' web/index.html
 cat > lib/core/config/env.dart <<'DART'
 import 'package:flutter/foundation.dart';
 

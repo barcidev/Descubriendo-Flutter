@@ -14,6 +14,7 @@ import '../live/live_models.dart';
 import '../theme/deck_theme.dart';
 import '../theme/tokens.dart';
 import '../ui/flutter_lockup.dart';
+import '../ui/qr_code.dart';
 import '../ui/reveal.dart';
 import '../ui/terminal.dart';
 import 'sections.dart';
@@ -209,7 +210,7 @@ class _Roll extends StatelessWidget {
                           children: [
                             TextSpan(text: person.name),
                             TextSpan(
-                              text: '  ${person.widget}()',
+                              text: '  ${asCall(person.widget)}',
                               style: DeckType.monoSmall.copyWith(
                                 fontSize: 22,
                                 color: const Color(0xFF5BAAFF),
@@ -396,6 +397,8 @@ class _PostCredits extends StatelessWidget {
   }
 }
 
+const _getStarted = 'https://docs.flutter.dev/get-started';
+
 const _quitLines = [
   TermLine.command('q', pause: Duration(milliseconds: 500)),
   TermLine('Application finished.', pause: Duration(milliseconds: 500)),
@@ -464,6 +467,31 @@ class _Finished extends StatelessWidget {
                                 Text(
                                   Config.role,
                                   style: DeckType.small.copyWith(color: colors.muted),
+                                ),
+                              ],
+                            ),
+                          ],
+                        ),
+                      ),
+                      const SizedBox(height: 40),
+                      // Para empezar mañana: la guía oficial, para escanear al salir.
+                      EnterOnce(
+                        delay: const Duration(milliseconds: 2000),
+                        child: Row(
+                          children: [
+                            const QrCode(data: _getStarted, size: 190),
+                            const SizedBox(width: 28),
+                            Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                Text(
+                                  'Para empezar mañana',
+                                  style: DeckType.headline.copyWith(fontSize: 34, color: colors.ink),
+                                ),
+                                const SizedBox(height: 8),
+                                Text(
+                                  'docs.flutter.dev/get-started',
+                                  style: DeckType.mono.copyWith(color: colors.accentText),
                                 ),
                               ],
                             ),

@@ -49,6 +49,12 @@ class _Browser implements Browser {
   Future<bool> showDemoApps() async => false;
 
   @override
+  void preloadApp(String path, {required VoidCallback onNext, required VoidCallback onPrevious}) {}
+
+  @override
+  void placeApp(Rect? rect) {}
+
+  @override
   MessageChannel channel(String name) => throw UnimplementedError();
 }
 

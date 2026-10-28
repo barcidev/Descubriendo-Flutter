@@ -32,8 +32,19 @@
 
     <section class="yo" id="yo" hidden>
       <p class="etiqueta" id="saludo">Hoy eres</p>
-      <h1 class="widget"><span id="widget"></span><span class="parentesis">()</span></h1>
+      <div class="fila-widget">
+        <h1 class="widget"><span id="widget"></span><span class="parentesis" id="parentesis">()</span></h1>
+        <button type="button" class="info" id="info" aria-label="¿Qué hace este widget?" aria-expanded="false" aria-controls="burbuja" hidden>
+          <svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="9.25"/><path d="M12 10.75v5.5"/><circle cx="12" cy="7.6" r=".6" class="punto-info"/></svg>
+        </button>
+      </div>
       <p class="frase" id="frase"></p>
+      <div class="burbuja" id="burbuja" role="tooltip" hidden>
+        <p class="burbuja-etiqueta">¿Qué hace?</p>
+        <p class="burbuja-titulo" id="burbujaTitulo"></p>
+        <p class="burbuja-texto" id="burbujaTexto"></p>
+        <p class="burbuja-pie">Widget de Flutter · toca afuera para cerrar</p>
+      </div>
     </section>
 
     <section id="pantalla" class="pantalla" aria-live="polite"></section>
@@ -45,6 +56,7 @@
         <button type="submit" class="boton">Enviar pregunta</button>
         <p class="nota" id="notaPregunta"></p>
       </form>
+      <div class="mios" id="misPreguntasLista" hidden></div>
     </details>
   </main>
 
@@ -54,6 +66,7 @@
     <button type="button" data-r="aplauso"><span>👏</span><small>aplauso</small></button>
   </nav>
 
+  <script src="/marcas.js"></script>
   <script src="/app.js"></script>
 </body>
 </html>

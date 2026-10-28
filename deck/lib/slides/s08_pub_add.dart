@@ -5,7 +5,6 @@ import '../engine/slide.dart';
 import '../theme/deck_theme.dart';
 import '../theme/tokens.dart';
 import '../ui/blocks.dart';
-import '../ui/qr_code.dart';
 import '../ui/reveal.dart';
 import '../ui/slide_scaffold.dart';
 import 'sections.dart';
@@ -133,7 +132,6 @@ class _WhereToStart extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final colors = context.colors;
-    const start = 'https://docs.flutter.dev/get-started';
     return SlideScaffold(
       title: 'Por dónde empezar mañana',
       child: Row(
@@ -154,8 +152,8 @@ class _WhereToStart extends StatelessWidget {
           Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              const QrCode(data: start, size: 300),
-              const SizedBox(height: 18),
+              // El QR de la guía oficial está en el cierre, para escanearlo
+              // al salir.
               Text(
                 'docs.flutter.dev/get-started',
                 style: DeckType.mono.copyWith(color: colors.accentText),

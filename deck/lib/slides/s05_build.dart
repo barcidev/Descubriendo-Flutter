@@ -542,7 +542,7 @@ class _ChosenExcuses extends StatelessWidget {
                         ),
                       ),
                       Text(
-                        '— ${excuse.author}()',
+                        '— ${asCall(excuse.author)}',
                         style: DeckType.mono.copyWith(color: colors.accentText),
                       ),
                     ],

@@ -4,7 +4,7 @@ Charla del 28 de octubre de 2026, 6:00 p. m., Universidad Autónoma del Caribe.
 
 | Carpeta | Qué es |
 |---|---|
-| `deck/` | La presentación: una app de Flutter Web (38 diapositivas). |
+| `deck/` | La presentación: una app de Flutter Web (36 diapositivas). |
 | `servidor/` | Las votaciones en vivo: servidor en Dart (shelf + WebSocket), la página del celular, la página de moderación y el guion. |
 | `contador/` | La plantilla de `flutter create` con 10 líneas más: escucha los toques del público. Es para el hot reload en vivo. |
 | `GUION.md` | Copia para imprimir de las notas de cada diapositiva. La fuente es `servidor/privado/guion.md`, que solo se entrega a quien entra con el token. |
@@ -103,10 +103,11 @@ En vivo, en `contador/lib/main.dart`:
 2. Cambia `'Flutter Demo Home Page'` por la mejor excusa.
 3. Guarda. El color cambia y el número no vuelve a cero.
 
-## 6. La demo de EcoEats (diapositivas 35 y 37)
+## 6. La demo de EcoEats (diapositivas 33 y 35)
 
-- **Dentro de la charla (35):** EcoEats web corre en el celular dibujado. Con `presentar.sh` se sirve en `http://127.0.0.1:8090/ecoeats/`. Inicia sesión una vez en el ensayo: queda guardada en ese Chrome.
-- **Después de los créditos (37):** cinco segundos después de la escena post-créditos, `presentar.sh` trae al frente las apps de `DEMO_APPS` (por omisión `Simulator`) y la charla pasa sola al cierre. Para traer también el editor: `DEMO_APPS="Visual Studio Code,Simulator" ./presentar.sh https://flutter-baq.onrender.com`. Usa `open -a`, que no pide permisos especiales de macOS.
+- **Dentro de la charla (33):** EcoEats web corre en el iPhone dibujado. La charla la carga escondida desde que abre, así que al llegar ya está lista. Con `presentar.sh` se sirve en `http://127.0.0.1:8090/ecoeats/`. Inicia sesión una vez en el ensayo: queda guardada en el Chrome de la charla.
+- **El Chrome de la charla:** `presentar.sh` abre Chrome con un perfil propio (`~/.descubriendo-flutter/chrome`), como ventana de app y en pantalla completa del sistema: Esc no la quita, y no ofrece guardar contraseñas, autocompletar ni traducir. La primera vez pide el token del presentador.
+- **Después de los créditos (35):** cinco segundos después de la escena post-créditos, `presentar.sh` trae al frente las apps de `DEMO_APPS` (por omisión `Simulator`) y la charla pasa sola al cierre. Para traer también el editor: `DEMO_APPS="Visual Studio Code,Simulator" ./presentar.sh https://flutter-baq.onrender.com`. Usa `open -a`, que no pide permisos especiales de macOS.
 - EcoEats ya está en el simulador iPhone 16e con la sesión iniciada: no lo cierres. Corre la app `contador` en otro simulador (iPhone 17 Pro), así las dos quedan listas en ventanas separadas.
 
 ## Checklist del día
@@ -117,7 +118,7 @@ En vivo, en `contador/lib/main.dart`:
   - Corre `./presentar.sh …`, escribe el token antes de conectar el proyector y pon Chrome en pantalla completa (tecla **F**).
   - Abre `/moderar/` en el celular y entra con el mismo token.
   - Deja corriendo `contador` en el simulador y EcoEats en el emulador.
-  - Abre la diapositiva 35 una vez para que EcoEats web cargue (y revisa que la sesión siga iniciada).
+  - Abre la diapositiva 33 una vez y revisa que EcoEats siga con la sesión iniciada.
   - Revisa que `GEMINI_API_KEY` esté en Render.
 - **T−15 min:** deja la diapositiva 1 (el doctor y el QR) mientras la gente entra. Escanea tú primero para probar.
 - **Plan B sin internet:** la charla sigue. Las votaciones pasan a mano alzada: las teclas 1–9 suman votos.

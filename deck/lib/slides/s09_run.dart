@@ -3,9 +3,9 @@ import 'package:material_ui/material_ui.dart';
 import '../engine/deck_scope.dart';
 import '../engine/overview.dart';
 import '../engine/slide.dart';
+import '../live/live_controller.dart';
 import '../theme/deck_theme.dart';
 import '../theme/tokens.dart';
-import '../ui/app_frame.dart';
 import '../ui/blocks.dart';
 import '../ui/reveal.dart';
 import '../ui/slide_scaffold.dart';
@@ -18,30 +18,47 @@ final runSlides = [
     section: runSection,
     title: 'La demo',
     steps: 2,
+    // Sin barra de estado: el celular usa todo el alto.
+    chrome: false,
     builder: (context, step) => _Demo(step: step),
   ),
 ];
 
+/// Dónde vive EcoEats web: la charla la carga desde que abre (ver
+/// `Browser.preloadApp`).
+const demoAppPath = '/ecoeats/';
+
 const _runLines = [
-  TermLine.command('flutter run -d chrome --release'),
-  TermLine('Launching lib/main.dart on Chrome in release mode...', pause: Duration(milliseconds: 500)),
+  TermLine.command('flutter run -d "iPhone 17 Pro"'),
+  TermLine('Launching lib/main.dart on iPhone 17 Pro in release mode...', pause: Duration(milliseconds: 500)),
   TermLine(
-    'Compiling lib/main.dart for the Web...          14,8s',
-    pause: Duration(milliseconds: 2200),
+    'Compiling lib/main.dart...                         14,8s',
+    pause: Duration(milliseconds: 1800),
   ),
-  TermLine('✓ Built build/web', tone: TermTone.success, pause: Duration(milliseconds: 500)),
+  TermLine('✓ Built build/ios/iphonesimulator/Runner.app', tone: TermTone.success, pause: Duration(milliseconds: 400)),
   TermLine('Application started: EcoEats', tone: TermTone.accent, pause: Duration(milliseconds: 400)),
 ];
-
-/// El tamaño de la pantalla del celular, en puntos (un iPhone 16e).
-const _screen = Size(390, 844);
 
 /// Fondo del splash de EcoEats (flutter_native_splash.yaml).
 const _splashColor = Color(0xFFF4EEE4);
 
-/// La única diapositiva que habla de EcoEats: la app real, corriendo dentro
-/// de la charla. Primero «compila», después el simulador la abre como un
-/// celular, y queda para que cualquiera la pruebe.
+// Las medidas del iPhone dibujado, en puntos (como un iPhone 17 Pro).
+const _screenWidth = 390.0;
+const _screenHeight = 844.0;
+const _screen = Size(_screenWidth, _screenHeight);
+const _statusBar = 50.0;
+const _homeBar = 22.0;
+const _bezel = 12.0;
+const _band = 4.0;
+const _buttons = 4.0;
+const _device = Size(
+  _screenWidth + 2 * (_bezel + _band + _buttons),
+  _screenHeight + 2 * (_bezel + _band),
+);
+
+/// La única diapositiva que habla de EcoEats: la app real, versión web,
+/// corriendo dentro de un iPhone dibujado. La terminal «compila», el iPhone
+/// la abre como un simulador y queda para que cualquiera la pruebe.
 class _Demo extends StatefulWidget {
   const _Demo({required this.step});
 
@@ -54,17 +71,63 @@ class _Demo extends StatefulWidget {
 class _DemoState extends State<_Demo> with SingleTickerProviderStateMixin {
   late final _launch = AnimationController(
     vsync: this,
-    duration: const Duration(milliseconds: 1900),
-  );
+    duration: const Duration(milliseconds: 1500),
+  )..addListener(_maybeShow);
+  final _appArea = GlobalKey();
+  late final DeckScope _scope = DeckScope.of(context);
+  bool _shown = false;
+  bool _listening = false;
 
   @override
   void didChangeDependencies() {
     super.didChangeDependencies();
     if (Thumbnail.of(context) || Motion.reduced(context)) _launch.value = 1;
+    if (!_listening) {
+      _listening = true;
+      _scope.deck.addListener(_place);
+      _scope.live.addListener(_place);
+    }
+  }
+
+  /// Al terminar de crecer el splash, la app de verdad aparece encima.
+  void _maybeShow() {
+    if (_shown || _launch.value < 0.72) return;
+    _shown = true;
+    _place();
+  }
+
+  /// La app va sobre el área de la pantalla, salvo que haya algo encima de
+  /// la diapositiva (la vista general, el QR, la pausa, los rayos X…).
+  void _place() {
+    if (!mounted) return;
+    final deck = _scope.deck;
+    final live = _scope.live;
+    final covered = deck.overview ||
+        deck.qr ||
+        deck.paused ||
+        deck.xray ||
+        deck.slide.id != 'demo' ||
+        live.access == PresenterAccess.login ||
+        live.access == PresenterAccess.checking;
+    if (!_shown || covered || Thumbnail.of(context)) {
+      _scope.browser.placeApp(null);
+      return;
+    }
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!mounted || !_shown) return;
+      final box = _appArea.currentContext?.findRenderObject() as RenderBox?;
+      if (box == null || !box.hasSize) return;
+      final topLeft = box.localToGlobal(Offset.zero);
+      final bottomRight = box.localToGlobal(box.size.bottomRight(Offset.zero));
+      _scope.browser.placeApp(Rect.fromPoints(topLeft, bottomRight));
+    });
   }
 
   @override
   void dispose() {
+    _scope.deck.removeListener(_place);
+    _scope.live.removeListener(_place);
+    _scope.browser.placeApp(null);
     _launch.dispose();
     super.dispose();
   }
@@ -72,7 +135,10 @@ class _DemoState extends State<_Demo> with SingleTickerProviderStateMixin {
   @override
   Widget build(BuildContext context) {
     final colors = context.colors;
-    final scope = DeckScope.of(context);
+    // Si cambia el tamaño de la ventana (o la pantalla completa), la app se
+    // vuelve a acomodar.
+    MediaQuery.sizeOf(context);
+    _place();
     return Stack(
       fit: StackFit.expand,
       children: [
@@ -117,23 +183,23 @@ class _DemoState extends State<_Demo> with SingleTickerProviderStateMixin {
                   ],
                 ),
               ),
-              const SizedBox(width: 560),
+              const SizedBox(width: 600),
             ],
           ),
         ),
         Positioned(
-          right: Space.pageX,
-          top: 34,
-          bottom: Space.statusBar + 22,
+          right: Space.pageX - 30,
+          top: 14,
+          bottom: 14,
           child: AspectRatio(
-            aspectRatio: (_screen.width + 28) / (_screen.height + 56),
-            child: _Phone(
-              launch: _launch,
-              app: AppFrame(
-                path: '/ecoeats/',
-                placeholder: const _Splash(),
-                onNext: scope.deck.next,
-                onPrevious: scope.deck.previous,
+            aspectRatio: _device.width / _device.height,
+            child: FittedBox(
+              child: SizedBox.fromSize(
+                size: _device,
+                child: _IPhone(
+                  launch: _launch,
+                  appArea: _appArea,
+                ),
               ),
             ),
           ),
@@ -143,67 +209,185 @@ class _DemoState extends State<_Demo> with SingleTickerProviderStateMixin {
   }
 }
 
-/// Un celular dibujado: marco, pantalla con la app y, encima, el inicio
-/// del simulador mientras arranca.
-class _Phone extends StatelessWidget {
-  const _Phone({required this.launch, required this.app});
+/// Un iPhone como el del simulador: borde de titanio, botones a los lados,
+/// la isla dinámica y la barra de inicio.
+class _IPhone extends StatelessWidget {
+  const _IPhone({required this.launch, required this.appArea});
 
   final Animation<double> launch;
-  final Widget app;
+  final GlobalKey appArea;
+
+  static const _titanium = LinearGradient(
+    begin: Alignment.topLeft,
+    end: Alignment.bottomRight,
+    colors: [Color(0xFF9A9A9F), Color(0xFF3C3C40), Color(0xFF75757B), Color(0xFF2B2B2E)],
+    stops: [0, 0.35, 0.7, 1],
+  );
 
   @override
   Widget build(BuildContext context) {
-    return FittedBox(
-      child: Container(
-        width: _screen.width + 28,
-        height: _screen.height + 56,
-        padding: const EdgeInsets.fromLTRB(14, 42, 14, 14),
+    Widget button(double top, double height, {required bool left}) => Positioned(
+      top: top,
+      height: height,
+      left: left ? 0 : null,
+      right: left ? null : 0,
+      width: _buttons + 2,
+      child: DecoratedBox(
         decoration: BoxDecoration(
-          color: const Color(0xFF05070B),
-          borderRadius: BorderRadius.circular(60),
-          border: Border.all(color: const Color(0xFF2A3446), width: 3),
-          boxShadow: const [BoxShadow(color: Color(0x66000000), blurRadius: 40, offset: Offset(0, 18))],
+          gradient: _titanium,
+          borderRadius: BorderRadius.horizontal(
+            left: left ? const Radius.circular(3) : Radius.zero,
+            right: left ? Radius.zero : const Radius.circular(3),
+          ),
         ),
-        child: Stack(
-          children: [
-            // El parlante, arriba del borde: no tapa la app.
-            Positioned(
-              top: -26,
-              left: _screen.width / 2 - 40,
-              child: Container(
-                width: 80,
-                height: 10,
-                decoration: BoxDecoration(
-                  color: const Color(0xFF1B2230),
-                  borderRadius: BorderRadius.circular(5),
-                ),
-              ),
+      ),
+    );
+    return Stack(
+      children: [
+        // Botón de acción y volumen a la izquierda; encendido a la derecha.
+        button(150, 34, left: true),
+        button(212, 62, left: true),
+        button(290, 62, left: true),
+        button(236, 98, left: false),
+        Positioned.fill(
+          left: _buttons,
+          right: _buttons,
+          child: Container(
+            padding: const EdgeInsets.all(_band),
+            decoration: BoxDecoration(
+              gradient: _titanium,
+              borderRadius: BorderRadius.circular(70),
+              boxShadow: const [
+                BoxShadow(color: Color(0x80000000), blurRadius: 40, offset: Offset(0, 22)),
+              ],
             ),
-            ClipRRect(
-              borderRadius: BorderRadius.circular(44),
-              child: SizedBox.fromSize(
-                size: _screen,
-                child: AnimatedBuilder(
-                  animation: launch,
-                  builder: (context, _) => Stack(
-                    children: [
-                      Positioned.fill(child: app),
-                      if (launch.value < 1)
-                        Positioned.fill(child: _Launching(t: launch.value)),
-                    ],
+            child: Container(
+              padding: const EdgeInsets.all(_bezel),
+              decoration: BoxDecoration(
+                color: const Color(0xFF050506),
+                borderRadius: BorderRadius.circular(66),
+              ),
+              child: ClipRRect(
+                borderRadius: BorderRadius.circular(54),
+                child: SizedBox.fromSize(
+                  size: _screen,
+                  child: AnimatedBuilder(
+                    animation: launch,
+                    builder: (context, _) => _Screen(t: launch.value, appArea: appArea),
                   ),
                 ),
               ),
             ),
-          ],
+          ),
         ),
+      ],
+    );
+  }
+}
+
+/// La pantalla: la barra de estado con la isla, el área de la app (ahí se
+/// pone la app de verdad) y, mientras arranca, el inicio del simulador.
+class _Screen extends StatelessWidget {
+  const _Screen({required this.t, required this.appArea});
+
+  final double t;
+  final GlobalKey appArea;
+
+  @override
+  Widget build(BuildContext context) {
+    const ink = Color(0xFF1C1C1E);
+    return Stack(
+      children: [
+        // Debajo de la app: su splash, por si tarda un instante.
+        const Positioned.fill(child: _Splash()),
+        const Positioned(
+          left: 0,
+          right: 0,
+          top: 0,
+          height: _statusBar,
+          child: ColoredBox(color: _splashColor),
+        ),
+        Positioned(
+          left: 0,
+          right: 0,
+          top: _statusBar,
+          bottom: _homeBar,
+          child: SizedBox.expand(key: appArea),
+        ),
+        Positioned(
+          left: 0,
+          right: 0,
+          bottom: 0,
+          height: _homeBar,
+          child: ColoredBox(
+            color: _splashColor,
+            child: Center(
+              child: Container(
+                width: 134,
+                height: 5,
+                decoration: BoxDecoration(
+                  color: ink.withValues(alpha: 0.85),
+                  borderRadius: BorderRadius.circular(3),
+                ),
+              ),
+            ),
+          ),
+        ),
+        const Positioned(left: 0, right: 0, top: 0, height: _statusBar, child: _StatusBar(color: ink)),
+        if (t < 1) Positioned.fill(child: _Launching(t: t)),
+        // La isla dinámica, siempre encima.
+        Positioned(
+          top: 11,
+          left: _screen.width / 2 - 62,
+          child: Container(
+            width: 124,
+            height: 36,
+            decoration: BoxDecoration(
+              color: const Color(0xFF000000),
+              borderRadius: BorderRadius.circular(18),
+            ),
+          ),
+        ),
+      ],
+    );
+  }
+}
+
+class _StatusBar extends StatelessWidget {
+  const _StatusBar({required this.color});
+
+  final Color color;
+
+  @override
+  Widget build(BuildContext context) {
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(40, 15, 30, 0),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(
+            '6:00',
+            style: TextStyle(
+              fontFamily: DeckFonts.sans,
+              fontSize: 17,
+              fontWeight: FontWeight.w600,
+              color: color,
+            ),
+          ),
+          const Spacer(),
+          Icon(Icons.signal_cellular_alt, size: 18, color: color),
+          const SizedBox(width: 5),
+          Icon(Icons.wifi, size: 18, color: color),
+          const SizedBox(width: 5),
+          Icon(Icons.battery_full, size: 18, color: color),
+        ],
       ),
     );
   }
 }
 
 /// El arranque, como en iOS: el ícono crece desde su lugar hasta llenar la
-/// pantalla con el splash, y el splash se desvanece sobre la app.
+/// pantalla con el splash. Al final, la app de verdad queda encima.
 class _Launching extends StatelessWidget {
   const _Launching({required this.t});
 
@@ -213,12 +397,12 @@ class _Launching extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final grow = Motion.out.transform((t / 0.32).clamp(0, 1));
+    final grow = Motion.out.transform((t / 0.4).clamp(0, 1));
     final fade = 1 - Motion.inOut.transform(((t - 0.72) / 0.28).clamp(0, 1));
     final rect = Rect.lerp(_iconRect, Offset.zero & _screen, grow)!;
     return Stack(
       children: [
-        if (fade > 0.99 || grow < 1) const Positioned.fill(child: _HomeScreen()),
+        if (grow < 1) const Positioned.fill(child: _HomeScreen()),
         if (t > 0)
           Positioned.fromRect(
             rect: rect,
@@ -227,7 +411,7 @@ class _Launching extends StatelessWidget {
               child: Container(
                 decoration: BoxDecoration(
                   color: _splashColor,
-                  borderRadius: BorderRadius.circular(14 + 30 * grow),
+                  borderRadius: BorderRadius.circular(14 + 40 * grow),
                 ),
                 alignment: Alignment.center,
                 child: grow < 0.35
@@ -251,7 +435,7 @@ class _HomeScreen extends StatelessWidget {
 
   static const _columns = 4;
   static const _icon = 62.0;
-  static const _top = 78.0;
+  static const _top = 84.0;
   static const _rowHeight = 96.0;
 
   /// Dónde queda el ícono número [index] (de izquierda a derecha y de
@@ -291,30 +475,11 @@ class _HomeScreen extends StatelessWidget {
       child: Stack(
         children: [
           const Positioned(
-            left: 30,
-            top: 16,
-            child: Text(
-              '6:00',
-              style: TextStyle(
-                fontFamily: DeckFonts.sans,
-                fontSize: 17,
-                fontWeight: FontWeight.w600,
-                color: Color(0xFFFFFFFF),
-              ),
-            ),
-          ),
-          const Positioned(
-            right: 26,
-            top: 16,
-            child: Row(
-              children: [
-                Icon(Icons.signal_cellular_alt, size: 18, color: Color(0xFFFFFFFF)),
-                SizedBox(width: 6),
-                Icon(Icons.wifi, size: 18, color: Color(0xFFFFFFFF)),
-                SizedBox(width: 6),
-                Icon(Icons.battery_full, size: 18, color: Color(0xFFFFFFFF)),
-              ],
-            ),
+            left: 0,
+            right: 0,
+            top: 0,
+            height: _statusBar,
+            child: _StatusBar(color: Color(0xFFFFFFFF)),
           ),
           for (final (index, (icon, _, color)) in _apps.indexed)
             Positioned.fromRect(
@@ -347,13 +512,26 @@ class _HomeScreen extends StatelessWidget {
                 ),
               ),
             ),
+          // La barra de inicio también está en la pantalla de inicio.
+          Positioned(
+            left: _screen.width / 2 - 67,
+            bottom: 8,
+            child: Container(
+              width: 134,
+              height: 5,
+              decoration: BoxDecoration(
+                color: const Color(0xFFFFFFFF).withValues(alpha: 0.9),
+                borderRadius: BorderRadius.circular(3),
+              ),
+            ),
+          ),
         ],
       ),
     );
   }
 }
 
-/// Lo que se ve fuera del navegador (tests, miniaturas): el splash.
+/// El splash de EcoEats: lo que se ve mientras la app de verdad aparece.
 class _Splash extends StatelessWidget {
   const _Splash();
 

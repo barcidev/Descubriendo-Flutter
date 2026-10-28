@@ -135,7 +135,7 @@ class _QuestionsState extends State<_Questions> {
                           ),
                           const SizedBox(width: 20),
                           Text(
-                            '${question.author}()',
+                            asCall(question.author),
                             style: DeckType.monoSmall.copyWith(color: colors.faint),
                           ),
                         ],

@@ -1,20 +1,23 @@
 import 'package:flutter/foundation.dart';
 
 /// Lo que ve el celular del público en cada momento.
-enum AudienceMode { idle, poll, counter, excuse, questions, rating, credits }
+enum AudienceMode { idle, poll, counter, excuse, questions, rating, credits, crash }
 
 @immutable
 class PollOption {
-  const PollOption(this.id, this.label, {this.detail, this.correct = false});
+  const PollOption(this.id, this.label, {this.detail, this.correct = false, this.icon});
 
   final String id;
   final String label;
+
+  /// El ícono de la app que muestra el celular junto a la opción.
+  final String? icon;
 
   /// Una línea de contexto que la diapositiva muestra al revelar.
   final String? detail;
   final bool correct;
 
-  Map<String, Object?> toJson() => {'id': id, 'label': label};
+  Map<String, Object?> toJson() => {'id': id, 'label': label, 'icon': ?icon};
 }
 
 @immutable
@@ -61,6 +64,10 @@ class AudienceCue {
   const AudienceCue.rating() : this._(AudienceMode.rating);
 
   const AudienceCue.credits() : this._(AudienceMode.credits);
+
+  /// La pantalla roja también en los celulares; [fixed], ya arreglada.
+  const AudienceCue.crash({bool fixed = false})
+    : this._(AudienceMode.crash, revealed: fixed);
 
   const AudienceCue._(
     this.mode, {
@@ -148,6 +155,10 @@ class PollResults {
     voters: (json['voters'] as num? ?? 0).toInt(),
   );
 }
+
+/// El apodo escrito como llamada: `Expanded()`. Los que ya traen paréntesis,
+/// como `SizedBox(height: 182)`, quedan igual.
+String asCall(String widget) => widget.endsWith(')') ? widget : '$widget()';
 
 /// Alguien que acaba de escribir su nombre en el celular.
 @immutable

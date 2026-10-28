@@ -38,28 +38,22 @@ final createSlides = [
     builder: (context, step) => const _CreateProject(),
   ),
   Slide(
-    id: 'estructura',
-    section: createSection,
-    title: 'Paso 3: la estructura',
-    builder: (context, step) => const _Structure(),
-  ),
-  Slide(
     id: 'api-kotlin',
     section: createSection,
-    title: 'Paso 4: hablar con una API en Kotlin',
+    title: 'Paso 3: hablar con una API en Kotlin',
     steps: 4,
     builder: (context, step) => _KotlinApi(step: step),
   ),
   Slide(
     id: 'paquetes',
     section: createSection,
-    title: 'Paso 5: paquetes',
+    title: 'Paso 4: paquetes',
     builder: (context, step) => const _Packages(),
   ),
   Slide(
     id: 'publicar',
     section: createSection,
-    title: 'Paso 6: publicar (y el tema)',
+    title: 'Paso 5: publicar (y el tema)',
     steps: 3,
     cue: (step) => AudienceCue.poll(themePoll, open: step == 0, revealed: step >= 1),
     builder: (context, step) => _Publish(step: step),
@@ -124,65 +118,6 @@ class _CreateProject extends StatelessWidget {
                   'proyecto completo, con un ejemplo que ya corre.',
                   style: DeckType.small.copyWith(color: colors.muted),
                 ),
-              ],
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-}
-
-const _structure = '''
-lib/
-├── main.dart
-├── core/          red, sesión, errores
-├── design/        tema, colores, componentes
-└── features/
-    └── excusas/
-        ├── data/           cliente HTTP y modelos JSON
-        ├── domain/         modelos y reglas
-        ├── application/    estado
-        └── presentation/   pantallas y widgets''';
-
-class _Structure extends StatelessWidget {
-  const _Structure();
-
-  @override
-  Widget build(BuildContext context) {
-    return SlideScaffold(
-      title: 'Ordenar por funcionalidad, no por tipo de archivo',
-      child: Row(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Expanded(
-            flex: 11,
-            child: Container(
-              padding: const EdgeInsets.fromLTRB(32, 26, 32, 26),
-              decoration: BoxDecoration(
-                color: CodeColors.background,
-                borderRadius: BorderRadius.circular(Radii.md),
-                border: Border.all(color: CodeColors.border, width: Space.hairline),
-              ),
-              child: Text(
-                _structure,
-                style: DeckType.code.copyWith(fontSize: 24, color: CodeColors.plain),
-              ),
-            ),
-          ),
-          const SizedBox(width: 56),
-          const Expanded(
-            flex: 8,
-            child: CompareTable(
-              headers: ['Flutter', 'Si vienes de Spring'],
-              mono: true,
-              fontSize: 22,
-              firstColumnFlex: 1,
-              rows: [
-                ['data', 'repository y cliente'],
-                ['domain', 'entidades y reglas'],
-                ['application', 'service'],
-                ['presentation', 'controller y vista'],
               ],
             ),
           ),
@@ -391,7 +326,7 @@ class _LiveRequestState extends State<_LiveRequest> {
                       children: [
                         TextSpan(text: '«${excuse.texto}»  '),
                         TextSpan(
-                          text: '${excuse.apodo}()',
+                          text: asCall(excuse.apodo),
                           style: DeckType.monoSmall.copyWith(color: colors.accentText),
                         ),
                       ],
@@ -487,19 +422,41 @@ class _Publish extends StatefulWidget {
 }
 
 class _PublishState extends State<_Publish> {
+  Timer? _flicker;
+
   @override
   void didUpdateWidget(_Publish oldWidget) {
     super.didUpdateWidget(oldWidget);
     if (widget.step == oldWidget.step) return;
     final scope = DeckScope.of(context);
+    _flicker?.cancel();
     // Al revelar, gana un tema y se aplica; en el chiste, vuelve el oscuro.
-    final night = widget.step == 1 ? !_lightWon(scope.live) : true;
+    // Si hay empate, la charla no sabe qué ponerse: parpadea entre los dos.
+    final winner = _winner(scope.live);
+    if (widget.step == 1 && winner == _Theme.tie) {
+      var blinks = 0;
+      _flicker = Timer.periodic(const Duration(milliseconds: 420), (timer) {
+        blinks++;
+        scope.deck.setNight(blinks.isEven || blinks >= 7);
+        if (blinks >= 7) timer.cancel();
+      });
+      return;
+    }
+    final night = widget.step == 1 ? winner != _Theme.light : true;
     WidgetsBinding.instance.addPostFrameCallback((_) => scope.deck.setNight(night));
   }
 
-  bool _lightWon(LiveController live) {
+  @override
+  void dispose() {
+    _flicker?.cancel();
+    super.dispose();
+  }
+
+  _Theme _winner(LiveController live) {
     final results = live.resultsFor(themePoll.id);
-    return results.countOf('claro') > results.countOf('oscuro');
+    final light = results.countOf('claro');
+    final dark = results.countOf('oscuro');
+    return light == dark ? _Theme.tie : (light > dark ? _Theme.light : _Theme.dark);
   }
 
   @override
@@ -517,7 +474,7 @@ class _PublishState extends State<_Publish> {
             children: [
               const Expanded(
                 flex: 11,
-                child: Terminal(lines: _publishLines, title: 'zsh · paso 6', fontSize: 22),
+                child: Terminal(lines: _publishLines, title: 'zsh · paso 5', fontSize: 22),
               ),
               const SizedBox(width: 48),
               Expanded(
@@ -535,7 +492,9 @@ class _PublishState extends State<_Publish> {
                     Reveal(
                       visible: step == 1,
                       child: Text(
-                        'Un tema, toda la app: ThemeData.lerp interpola cada color.',
+                        _winner(live) == _Theme.tie
+                            ? '¿Empate? La charla no sabe qué ponerse.'
+                            : 'Un tema, toda la app: ThemeData.lerp interpola cada color.',
                         style: DeckType.small.copyWith(color: colors.muted),
                       ),
                     ),
@@ -546,7 +505,7 @@ class _PublishState extends State<_Publish> {
           ),
           if (step >= 2)
             Positioned.fill(
-              child: _ThemeJoke(lightWon: _lightWon(live)),
+              child: _ThemeJoke(winner: _winner(live)),
             ),
         ],
       ),
@@ -554,30 +513,67 @@ class _PublishState extends State<_Publish> {
   }
 }
 
-/// El chiste del final de la votación: si ganó el claro, el presentador
-/// hace rollback; si ganó el oscuro, se celebra.
-class _ThemeJoke extends StatelessWidget {
-  const _ThemeJoke({required this.lightWon});
+enum _Theme { dark, light, tie }
 
-  final bool lightWon;
+/// El chiste del final de la votación: si ganó el claro, el presentador
+/// hace rollback; si ganó el oscuro, se celebra; si hay empate, es un
+/// conflicto de merge y lo resuelve quien tiene permisos de admin.
+class _ThemeJoke extends StatelessWidget {
+  const _ThemeJoke({required this.winner});
+
+  final _Theme winner;
 
   @override
   Widget build(BuildContext context) {
     final colors = context.colors;
-    final (command, output, punchline, detail) = lightWon
-        ? (
-            'git revert tema-claro',
+    final (title, lines, punchline, detail) = switch (winner) {
+      _Theme.light => (
+        'zsh · rollback',
+        const [
+          TermLine.command('git revert tema-claro', pause: Duration(milliseconds: 300)),
+          TermLine(
             '[main 5f0c1d2] Revert "tema claro": mis ojos no aprobaron el PR',
-            'Democracia sí, pero esta charla es mía.',
-            'Ganó el claro, y lo respeto. Desde lejos. Con gafas de sol. '
-                'Volvemos al oscuro, como Dios y los devs mandan.',
-          )
-        : (
-            'flutter analyze --tema',
+            tone: TermTone.success,
+            pause: Duration(milliseconds: 500),
+          ),
+        ],
+        'Democracia sí, pero esta charla es mía.',
+        'Ganó el claro, y lo respeto. Desde lejos. Con gafas de sol. '
+            'Volvemos al oscuro, como Dios y los devs mandan.',
+      ),
+      _Theme.dark => (
+        'zsh · veredicto',
+        const [
+          TermLine.command('flutter analyze --tema', pause: Duration(milliseconds: 300)),
+          TermLine(
             'No issues found! El modo oscuro gana por mayoría (y por salud visual).',
-            '¿Por qué los devs usan modo oscuro?',
-            'Porque la luz atrae a los bugs.',
-          );
+            tone: TermTone.success,
+            pause: Duration(milliseconds: 500),
+          ),
+        ],
+        '¿Por qué los devs usan modo oscuro?',
+        'Porque la luz atrae a los bugs.',
+      ),
+      _Theme.tie => (
+        'zsh · merge',
+        const [
+          TermLine.command('git merge tema-claro', pause: Duration(milliseconds: 300)),
+          TermLine(
+            'CONFLICT (content): Merge conflict in lib/tema.dart',
+            tone: TermTone.danger,
+            pause: Duration(milliseconds: 500),
+          ),
+          TermLine(
+            'Automatic merge failed; fix conflicts and then commit the result.',
+            tone: TermTone.warning,
+            pause: Duration(milliseconds: 300),
+          ),
+        ],
+        'Empate técnico: conflicto de merge.',
+        'Y en los merge conflicts decide quien tiene permisos de admin. '
+            'Accept current change: modo oscuro.',
+      ),
+    };
     return EnterOnce(
       child: Container(
         padding: const EdgeInsets.fromLTRB(56, 44, 56, 48),
@@ -593,12 +589,9 @@ class _ThemeJoke extends StatelessWidget {
             SizedBox(
               width: 1300,
               child: Terminal(
-                title: lightWon ? 'zsh · rollback' : 'zsh · veredicto',
+                title: title,
                 fontSize: 24,
-                lines: [
-                  TermLine.command(command, pause: const Duration(milliseconds: 300)),
-                  TermLine(output, tone: TermTone.success, pause: const Duration(milliseconds: 500)),
-                ],
+                lines: lines,
               ),
             ),
             const SizedBox(height: 48),
@@ -611,7 +604,7 @@ class _ThemeJoke extends StatelessWidget {
             ),
             const SizedBox(height: 20),
             EnterOnce(
-              delay: Duration(milliseconds: lightWon ? 3400 : 4200),
+              delay: Duration(milliseconds: winner == _Theme.dark ? 4200 : 3400),
               child: Text(
                 detail,
                 style: DeckType.headline.copyWith(color: colors.accentText),

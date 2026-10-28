@@ -10,6 +10,7 @@ Teclas: → siguiente · ← anterior · Q QR gigante · X rayos X · T tema · 
 - Si alguien no puede escanear: oprime Q (QR gigante) o lee la dirección.
 - Al entrar, cada persona escribe su nombre y le toca un widget: ese es su apodo. Los nombres van apareciendo en la terminal («Llegó Ana → Expanded()»).
 - Pregúntale a alguien cuál le tocó. Diles que guarden el nombre para el final: salen en los créditos.
+- Cada apodo es único: hay 181 (widgets y constructores con nombre como ListView.builder); si llega más gente, SizedBox(height: N). El ícono ⓘ junto al apodo explica qué hace ese widget.
 
 ## calentamiento · ¿Con qué haces software hoy? · antes de empezar
 - Votación abierta: dales 30 segundos.
@@ -120,9 +121,7 @@ Teclas: → siguiente · ← anterior · Q QR gigante · X rayos X · T tema · 
 - Paso 2: «Tranquilos, era parte del show». Explica ?. ?? y ! («confía en mí»).
 - Cita de Tony Hoare: la referencia nula, el error de mil millones de dólares.
 
-## dart-y-kotlin · Dart para quien sabe Kotlin
-- Recorre la tabla rápido: val/final, nulos, data class, suspend/Future, Flow/Stream, sealed + when/switch, extensiones.
-
+- Los celulares también «revientan» con la pantalla roja (y vibran). En el paso 2 se arreglan solos: «Tranquilo: era parte del show».
 ## flutter-y-sus-primos · Flutter y sus primos
 - React, SwiftUI, Compose y Flutter llegaron a la misma idea: UI declarativa.
 
@@ -132,21 +131,19 @@ Teclas: → siguiente · ← anterior · Q QR gigante · X rayos X · T tema · 
 ## crear-proyecto · Pasos 1 y 2 · 6 min (sección)
 - flutter doctor y flutter create. pubspec.yaml es como build.gradle.kts.
 
-## estructura · Paso 3: la estructura
-- Carpetas por funcionalidad. Mapeo con Spring: data ≈ repository, application ≈ service, presentation ≈ controller.
-
-## api-kotlin · Paso 4: hablar con una API en Kotlin
+## api-kotlin · Paso 3: hablar con una API en Kotlin
 - Paso 1: el controlador en Kotlin (Spring Boot). Paso 2: el contrato JSON, el de verdad de GET /excusas, con la primera excusa que salió en pantalla.
 - Paso 3: el cliente en Dart con http y fromJson. Es el código que hace la petición del paso 4.
 - Paso 4: petición real a /excusas del servidor de la charla: son las mismas excusas que eligió la IA.
 - Si preguntan por errores: la línea del statusCode lanza una excepción y FutureBuilder la muestra en su estado de error. Con eso basta para empezar.
-## paquetes · Paso 5: paquetes
+## paquetes · Paso 4: paquetes
 - pub.dev es a Flutter lo que Maven Central a Spring y npm a Node: mismo concepto, otro nombre de archivo.
 - Lo diferente: cada paquete trae nota. Pub points (de 160, análisis automático), likes, descargas, publicador verificado y Flutter Favorite.
-## publicar · Paso 6: publicar y el tema
+## publicar · Paso 5: publicar y el tema
 - Un comando por tienda.
 - Votación «¿claro u oscuro?». Paso 2: la charla aplica sola el tema ganador.
 - Paso 3, el chiste: si ganó el claro, «git revert tema-claro» y vuelve el oscuro («democracia sí, pero esta charla es mía»). Si ganó el oscuro: «¿por qué los devs usan modo oscuro? Porque la luz atrae a los bugs».
+- Si hay empate, en el paso 2 la charla parpadea entre los dos temas («no sabe qué ponerse») y en el paso 3 es un conflicto de merge: decide quien tiene permisos de admin, modo oscuro.
 ## recomendaciones · Recomendaciones · 3 min (sección)
 - #0: «¿ya probaste flutter clean?».
 - Tres clics: antes de empezar, mientras construyes, antes de publicar.
@@ -155,10 +152,13 @@ Teclas: → siguiente · ← anterior · Q QR gigante · X rayos X · T tema · 
 ## por-donde-empezar · Por dónde empezar
 - DartPad, el codelab oficial, Widget of the Week, pub.dev.
 - Invita a la comunidad local: BAQ JUG, CaribeDev, DevJVM.
+- El QR de la guía oficial está en el cierre, para escanearlo al salir.
 
 ## demo · La demo · 3 min (sección)
-- La terminal «compila», el simulador de la diapositiva arranca y abre EcoEats: es la app real, versión web, corriendo dentro de la charla contra la API en Kotlin.
-- Haz clic en el celular y recórrela: login con JWT, catálogo, búsqueda sin tildes («camaron»), detalle, tema e idioma.
+- La terminal «compila», el iPhone de la diapositiva arranca y abre EcoEats: es la app real, versión web, contra la API en Kotlin.
+- La app se carga escondida desde que abre la charla: al llegar aquí ya está lista, sin pantalla en blanco. Si sales y vuelves, sigue donde la dejaste.
+- Úsala con el mouse como si fuera un dedo: toques, arrastres y el gesto de deslizar desde el borde para volver (se comporta como en un iPhone).
+- Recórrela: login con JWT, catálogo, búsqueda sin tildes («camaron»), detalle, tema e idioma.
 - El clicker sigue funcionando con la app en foco (PgUp y PgDn).
 - Paso 2 muestra los números de EcoEats: 3 días, 213 commits, 96 widgets, 407 tests.
 - La app en el simulador del Mac va al final, después de los créditos.
@@ -173,5 +173,5 @@ Teclas: → siguiente · ← anterior · Q QR gigante · X rayos X · T tema · 
 - Cinco segundos después, el Mac trae al frente el simulador (con presentar.sh) y la charla pasa sola al cierre. Muestra la app de verdad.
 - Sin presentar.sh, la charla sale de pantalla completa: cambia al simulador con Cmd+Tab.
 ## application-finished · Application finished.
-- Al volver del simulador ya está aquí: gracias, la calificación en vivo («Califiquen el deploy») y los organizadores.
+- Al volver del simulador ya está aquí: gracias, la calificación en vivo («Califiquen el deploy»), el QR de la guía oficial para empezar mañana y los organizadores.
 - Deja esta diapositiva mientras sales.

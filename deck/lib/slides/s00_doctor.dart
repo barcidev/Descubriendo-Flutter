@@ -60,7 +60,7 @@ const _doctorLines = [
 List<TermLine> _arrivalLines(List<Arrival> arrivals) => [
   for (final arrival in arrivals)
     TermLine(
-      '[✓] Llegó ${arrival.name} → ${arrival.widget}()',
+      '[✓] Llegó ${arrival.name} → ${asCall(arrival.widget)}',
       id: arrival.number,
     ),
 ];

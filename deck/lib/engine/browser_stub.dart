@@ -1,4 +1,5 @@
 import 'package:flutter/foundation.dart';
+import 'package:flutter/painting.dart' show Rect;
 
 import 'browser.dart';
 
@@ -34,6 +35,12 @@ class _NoBrowser implements Browser {
 
   @override
   Future<bool> showDemoApps() async => false;
+
+  @override
+  void preloadApp(String path, {required VoidCallback onNext, required VoidCallback onPrevious}) {}
+
+  @override
+  void placeApp(Rect? rect) {}
 
   @override
   MessageChannel channel(String name) => _NoChannel();

@@ -46,13 +46,9 @@ final dartSlides = [
     title: 'La pantalla roja',
     steps: 2,
     chrome: false,
+    // Los celulares también «revientan» y, en el paso 2, se arreglan.
+    cue: (step) => AudienceCue.crash(fixed: step >= 1),
     builder: (context, step) => _RedScreen(step: step),
-  ),
-  Slide(
-    id: 'dart-y-kotlin',
-    section: migrateSection,
-    title: 'Dart para quien sabe Kotlin',
-    builder: (context, step) => const _DartForKotlin(),
   ),
   Slide(
     id: 'flutter-y-sus-primos',
@@ -352,33 +348,6 @@ class _NullSafety extends StatelessWidget {
             ),
           ],
         ),
-      ),
-    );
-  }
-}
-
-class _DartForKotlin extends StatelessWidget {
-  const _DartForKotlin();
-
-  @override
-  Widget build(BuildContext context) {
-    return const SlideScaffold(
-      title: 'Si sabes Kotlin, ya sabes casi todo Dart',
-      child: CompareTable(
-        headers: ['', 'Kotlin', 'Dart'],
-        highlightColumn: 2,
-        fontSize: 22,
-        firstColumnFlex: 0.9,
-        rows: [
-          ['Inmutable', 'val nombre = "Ana"', "final nombre = 'Ana';"],
-          ['Nulos', 'String?  ?.  ?:  !!', 'String?  ?.  ??  !'],
-          ['Modelo de datos', 'data class Excusa(val texto: String)', 'class Excusa { final String texto; }  · o un record'],
-          ['Asincronía', 'suspend fun cargar(): List<Excusa>', 'Future<List<Excusa>> cargar() async'],
-          ['Flujos', 'Flow<Excusa>', 'Stream<Excusa>'],
-          ['Tipos cerrados', 'sealed class + when', 'sealed class + switch'],
-          ['Extensiones', 'fun String.grito() = uppercase()', 'extension on String { String grito() => toUpperCase(); }'],
-          ['Colecciones', 'excusas.filter { it.creible }', 'excusas.where((e) => e.creible)'],
-        ],
       ),
     );
   }

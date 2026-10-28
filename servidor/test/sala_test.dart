@@ -2,6 +2,7 @@ import 'dart:convert';
 import 'dart:math' as math;
 
 import 'package:servidor/jurado.dart';
+import 'package:servidor/personas.dart';
 import 'package:servidor/sala.dart';
 import 'package:test/test.dart';
 
@@ -158,13 +159,65 @@ void main() {
     expect(presentador.ultimoEstado['joins'], isEmpty);
   });
 
-  test('los apodos se reparten sin repetir mientras alcancen', () {
+  test('cada persona tiene un apodo único, aunque llegue todo un auditorio',
+      () {
+    final total = personas.length + variantes.length + 40;
     final widgets = <Object?>{};
-    for (var i = 0; i < 20; i++) {
+    for (var i = 0; i < total; i++) {
       final celular = entra('cliente-${i.toString().padLeft(4, '0')}');
-      widgets.add((jsonDecode(celular.recibidos.first) as Map)['widget']);
+      final yo = jsonDecode(celular.recibidos.first) as Map;
+      widgets.add(yo['widget']);
+      expect(yo['que'], isNotEmpty, reason: 'cada apodo explica qué hace');
     }
-    expect(widgets, hasLength(20));
+    expect(widgets, hasLength(total));
+    expect(widgets, contains(startsWith('SizedBox(height: ')));
+  });
+
+  test('si el servidor se reinicia, cada celular recupera su apodo', () {
+    final primera = entra('cliente-0001');
+    final apodo = (jsonDecode(primera.recibidos.first) as Map)['widget'];
+    // Servidor nuevo, sin memoria: el celular manda el apodo que tenía.
+    sala = Sala(azar: math.Random(7));
+    final otraVez = _Celular(sala)
+      ..manda({'t': 'hola', 'id': 'cliente-0001', 'widget': apodo});
+    expect((jsonDecode(otraVez.recibidos.first) as Map)['widget'], apodo);
+    // Un apodo inventado no se acepta.
+    final tramposo = _Celular(sala)
+      ..manda({'t': 'hola', 'id': 'cliente-0002', 'widget': 'SuperAdmin'});
+    expect((jsonDecode(tramposo.recibidos.first) as Map)['widget'],
+        isNot('SuperAdmin'));
+  });
+
+  test('al recargar, cada persona recupera lo que ya había mandado', () async {
+    final jurado = _Jurado();
+    sala = Sala(azar: math.Random(1), jurado: jurado);
+    presentador = _Celular(sala, presentador: true);
+    presentador.manda({
+      't': 'cue',
+      'cue': {'mode': 'excuse', 'open': true, 'seconds': 60},
+    });
+    final celular = entra('cliente-0001')
+      ..manda({'t': 'excusa', 'texto': 'Fue el DNS'})
+      ..manda({'t': 'pregunta', 'texto': '¿Flutter sirve para web?'});
+    final mios = jsonDecode(celular.recibidos.last) as Map;
+    expect(mios['t'], 'mios');
+    expect(mios['preguntas'], ['¿Flutter sirve para web?']);
+    // Recarga: conexión nueva, mismo cliente.
+    sala.salir(celular.conexion);
+    final otraVez = entra('cliente-0001');
+    final yo = jsonDecode(otraVez.recibidos.first) as Map;
+    expect(yo['t'], 'yo');
+    expect(yo['excusas'], ['Fue el DNS']);
+    expect(yo['preguntas'], ['¿Flutter sirve para web?']);
+  });
+
+  test('el catálogo no repite apodos y todos explican qué hacen', () {
+    final todos = [...personas, ...variantes];
+    expect({for (final p in todos) p.widget}, hasLength(todos.length));
+    for (final persona in todos) {
+      expect(persona.que, isNotEmpty, reason: persona.widget);
+      expect(persona.frase, isNotEmpty, reason: persona.widget);
+    }
   });
 
   test('la lista de asistentes, para los créditos, va en orden de llegada', () {

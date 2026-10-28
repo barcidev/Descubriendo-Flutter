@@ -21,15 +21,17 @@
 
   const misVotos = leer('charla.votos', {});
   let miNombre = leer('charla.nombre', null);
-  let misExcusas = leer('charla.excusas', 0);
   let misEstrellas = leer('charla.estrellas', 0);
+  // Lo que esta persona ya mandó: el servidor lo devuelve al reconectar.
+  let mias = leer('charla.mias', { excusas: [], preguntas: [] });
 
   let socket = null;
   let intentos = 0;
   let estado = null;
   let modoPintado = '';
   let toques = 0;
-  let borrador = {};
+  // Lo que se está escribiendo y no se ha enviado: sobrevive a recargar.
+  const borrador = leer('charla.borradores', {});
   // Cuándo se cierra la ronda de excusas, en la hora de este celular.
   let finExcusas = 0;
 
@@ -40,12 +42,14 @@
     socket = new WebSocket(`${protocolo}://${location.host}/ws`);
     socket.onopen = () => {
       intentos = 0;
-      enviar({ t: 'hola', id: cliente, nombre: miNombre || undefined });
+      // El apodo guardado vuelve con la persona si el servidor se reinició.
+      enviar({ t: 'hola', id: cliente, nombre: miNombre || undefined, widget: leer('charla.widget', null) || undefined });
       marcar(true);
     };
     socket.onmessage = (evento) => {
       const mensaje = JSON.parse(evento.data);
       if (mensaje.t === 'yo') pintarYo(mensaje);
+      if (mensaje.t === 'yo' || mensaje.t === 'mios') recordarMias(mensaje);
       if (mensaje.t === 'nombre' && mensaje.ok === false) {
         $('notaNombre').textContent = 'Ese nombre no pasó el linter. Prueba con otro.';
         $('formNombre').querySelector('button').disabled = false;
@@ -112,8 +116,15 @@
     $('yo').hidden = false;
     $('preguntar').hidden = false;
     $('saludo').textContent = `Hola, ${miNombre}. Tu apodo de hoy`;
+    // SizedBox(height: 182) ya trae sus paréntesis.
+    const conParentesis = yo.widget.endsWith(')');
     $('widget').textContent = yo.widget;
+    $('parentesis').hidden = conParentesis;
+    $('burbujaTitulo').textContent = conParentesis ? yo.widget : `${yo.widget}()`;
+    $('burbujaTexto').textContent = yo.que || '';
+    $('info').hidden = !yo.que;
     $('frase').textContent = yo.frase;
+    guardar('charla.widget', yo.widget);
     if (estado) pintar();
   }
 
@@ -124,11 +135,35 @@
     return nodo;
   }
 
+  function recordarMias(mensaje) {
+    mias = { excusas: mensaje.excusas || [], preguntas: mensaje.preguntas || [] };
+    guardar('charla.mias', mias);
+    if (mensaje.estrellas) {
+      misEstrellas = mensaje.estrellas;
+      guardar('charla.estrellas', misEstrellas);
+    }
+    pintarMias();
+  }
+
+  function pintarMias() {
+    const lista = (id, textos, titulo) => {
+      const nodo = $(id);
+      if (!nodo) return;
+      nodo.replaceChildren();
+      nodo.hidden = textos.length === 0;
+      if (!textos.length) return;
+      nodo.append(el('p', 'etiqueta-lista', titulo), ...textos.map((texto) => el('p', 'mio', texto)));
+    };
+    lista('misExcusasLista', mias.excusas, 'Lo que mandaste');
+    lista('misPreguntasLista', mias.preguntas, 'Tus preguntas');
+  }
+
   function pintar() {
     $('conectados').textContent = `${estado.connected} conectados`;
     if (!miNombre || $('yo').hidden) return;
     const cue = estado.cue || { mode: 'idle' };
-    const clave = cue.mode + (cue.poll ? cue.poll.id : '');
+    // La pantalla roja se vuelve a pintar cuando se «arregla».
+    const clave = cue.mode + (cue.poll ? cue.poll.id : '') + (cue.mode === 'crash' ? String(cue.revealed) : '');
     // Si la pantalla es la misma, solo se actualizan los números: así no se
     // pierde lo que la persona está escribiendo.
     if (clave === modoPintado && actualizar(cue)) return;
@@ -142,6 +177,7 @@
       case 'questions': pintarPreguntas(pantalla); break;
       case 'rating': pintarEstrellas(pantalla); break;
       case 'credits': pintarCreditos(pantalla); break;
+      case 'crash': pintarError(pantalla, cue); break;
       default: pintarEspera(pantalla);
     }
   }
@@ -151,7 +187,7 @@
     if (cue.mode === 'poll') { pintarResultados(cue); return true; }
     if (cue.mode === 'counter') { $('total').textContent = estado.counter; return true; }
     if (cue.mode === 'excuse') { relojExcusas(); return true; }
-    return ['rating', 'questions', 'credits', 'idle'].includes(cue.mode);
+    return ['rating', 'questions', 'credits', 'idle', 'crash'].includes(cue.mode);
   }
 
   function pintarEspera(pantalla) {
@@ -174,7 +210,14 @@
       const boton = el('button', 'opcion');
       boton.type = 'button';
       boton.dataset.id = opcion.id;
-      boton.append(el('span', 'barrita'), el('span', 'marca'), el('span', 'texto', opcion.label), el('span', 'porcentaje', ''));
+      boton.append(el('span', 'barrita'), el('span', 'marca'));
+      if (opcion.icon && window.MARCAS) {
+        const icono = el('span', 'marca-app');
+        icono.dataset.icono = opcion.icon;
+        pintarIcono(icono, cue.revealed);
+        boton.append(icono);
+      }
+      boton.append(el('span', 'texto', opcion.label), el('span', 'porcentaje', ''));
       boton.classList.toggle('elegida', elegidas.has(opcion.id));
       boton.addEventListener('click', () => {
         if (!estado.cue.open) return;
@@ -197,9 +240,22 @@
     pintarResultados(cue);
   }
 
+  // El logo de la app, como en la charla. «Esta presentación» muestra el de
+  // Flutter solo cuando se revela la respuesta.
+  function pintarIcono(nodo, revelado) {
+    const clave = nodo.dataset.icono === 'esta' && revelado ? 'flutter' : nodo.dataset.icono;
+    const marca = window.MARCAS[clave];
+    if (!marca || nodo.dataset.pintado === clave) return;
+    nodo.dataset.pintado = clave;
+    nodo.style.background = marca.fondo;
+    nodo.style.setProperty('--escala', marca.escala);
+    nodo.innerHTML = marca.svg; // marcado fijo de marcas.js, nunca texto del público
+  }
+
   function pintarResultados(cue) {
     const opciones = $('opciones');
     if (!opciones) return;
+    for (const icono of opciones.querySelectorAll('.marca-app')) pintarIcono(icono, cue.revealed);
     const resultados = estado.results || { counts: {}, voters: 0 };
     const yaVote = (misVotos[cue.poll.id] || []).length > 0;
     const correctas = new Set(cue.correct || []);
@@ -247,7 +303,10 @@
     texto.rows = 3;
     texto.placeholder = marcador;
     texto.value = borrador[titulo] || '';
-    texto.addEventListener('input', () => { borrador[titulo] = texto.value; });
+    texto.addEventListener('input', () => {
+      borrador[titulo] = texto.value;
+      guardar('charla.borradores', borrador);
+    });
     const enviarBoton = el('button', 'boton', boton);
     enviarBoton.type = 'submit';
     const nota = el('p', 'nota', '');
@@ -260,6 +319,7 @@
       alEnviar(valor);
       texto.value = '';
       borrador[titulo] = '';
+      guardar('charla.borradores', borrador);
       nota.textContent = enviada;
     });
     return [el('h2', null, titulo), el('p', 'ayuda', ayuda), form];
@@ -274,15 +334,15 @@
       maximo: 140,
       marcador: 'Ej: en mi máquina sí funciona',
       boton: 'Enviar excusa',
-      limite: () => misExcusas < 3,
+      limite: () => mias.excusas.length < 3,
       enviada: 'Enviada. Puedes mandar hasta tres.',
-      alEnviar: (texto) => {
-        enviar({ t: 'excusa', texto });
-        guardar('charla.excusas', ++misExcusas);
-      },
+      alEnviar: (texto) => enviar({ t: 'excusa', texto }),
     });
     form.id = 'formExcusa';
-    pantalla.append(titulo, reloj, ayuda, form);
+    const lista = el('div', 'mios');
+    lista.id = 'misExcusasLista';
+    pantalla.append(titulo, reloj, ayuda, form, lista);
+    pintarMias();
     relojExcusas();
   }
 
@@ -309,6 +369,34 @@
       el('p', 'ayuda', 'Mira la pantalla: una IA junta las que se parecen y escoge cinco. ¿Te falta la tuya? Escríbela abajo.'),
     );
     $('preguntar').open = true;
+  }
+
+  // La broma del error de mil millones de dólares, también en el celular.
+  function pintarError(pantalla, cue) {
+    const caja = el('div', `pantalla-roja${cue.revealed ? ' arreglada' : ''}`);
+    if (cue.revealed) {
+      const codigo = el('code', null, "String? excusa;\nexcusa ?? 'Funciona en mi máquina'   // sin pantalla roja");
+      caja.append(
+        el('p', 'listo', '✓ Hot fix aplicado'),
+        el('h2', null, `Tranquilo, ${miNombre}: era parte del show.`),
+        el('p', null, 'Ese «!» le dijo al compilador «confía en mí». Null safety existe para no tener que decirlo.'),
+        codigo,
+        el('p', null, '«Mi error de mil millones de dólares: la referencia nula.» — Tony Hoare'),
+      );
+    } else {
+      caja.append(
+        el('p', 'error-titulo', 'Null check operator used on a null value'),
+        el('pre', null,
+          'The relevant error-causing widget was:\n' +
+          '  TuCelular  lib/celular.dart:42:13\n\n' +
+          'When the exception was thrown, this was the stack:\n' +
+          '#0  _TuCelularState.build (package:charla/celular.dart:57:24)\n' +
+          '#1  StatefulElement.build (package:flutter/src/widgets/framework.dart)\n' +
+          '#2  ComponentElement.performRebuild (package:flutter/…)'),
+      );
+      if (navigator.vibrate) navigator.vibrate([70, 50, 70, 50, 160]);
+    }
+    pantalla.append(caja);
   }
 
   function pintarCreditos(pantalla) {
@@ -352,6 +440,39 @@
     pantalla.append(fila, leyenda);
   }
 
+  // ---------- Qué hace mi widget ----------
+
+  // Un tooltip que se abre con el botón de información y se cierra al tocar
+  // afuera, con Esc o con el mismo botón.
+  let cerrarAyuda = 0;
+  function mostrarAyuda(mostrar) {
+    const info = $('info');
+    const burbuja = $('burbuja');
+    clearTimeout(cerrarAyuda);
+    info.setAttribute('aria-expanded', String(mostrar));
+    if (mostrar) {
+      burbuja.hidden = false;
+      const boton = info.getBoundingClientRect();
+      const caja = burbuja.getBoundingClientRect();
+      burbuja.style.setProperty('--flecha', `${boton.left + boton.width / 2 - caja.left}px`);
+      requestAnimationFrame(() => requestAnimationFrame(() => burbuja.classList.add('abierta')));
+      if (navigator.vibrate) navigator.vibrate(5);
+    } else {
+      burbuja.classList.remove('abierta');
+      cerrarAyuda = setTimeout(() => { burbuja.hidden = true; }, 240);
+    }
+  }
+  $('info').addEventListener('click', (evento) => {
+    evento.stopPropagation();
+    mostrarAyuda($('info').getAttribute('aria-expanded') !== 'true');
+  });
+  document.addEventListener('click', (evento) => {
+    if ($('info').getAttribute('aria-expanded') === 'true' && !$('burbuja').contains(evento.target)) mostrarAyuda(false);
+  });
+  document.addEventListener('keydown', (evento) => {
+    if (evento.key === 'Escape' && $('info').getAttribute('aria-expanded') === 'true') mostrarAyuda(false);
+  });
+
   // ---------- Siempre disponibles ----------
 
   $('formPregunta').addEventListener('submit', (evento) => {
@@ -361,8 +482,16 @@
     if (texto.length < 3) { nota.textContent = 'Escribe un poquito más.'; return; }
     enviar({ t: 'pregunta', texto });
     $('textoPregunta').value = '';
+    borrador.pregunta = '';
+    guardar('charla.borradores', borrador);
     nota.textContent = 'Recibida. Al final, una IA escoge las que cubren más dudas.';
   });
+  $('textoPregunta').value = borrador.pregunta || '';
+  $('textoPregunta').addEventListener('input', () => {
+    borrador.pregunta = $('textoPregunta').value;
+    guardar('charla.borradores', borrador);
+  });
+  pintarMias();
 
   let ultimaReaccion = 0;
   for (const boton of document.querySelectorAll('.reacciones button')) {

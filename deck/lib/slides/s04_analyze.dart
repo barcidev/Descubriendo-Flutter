@@ -136,9 +136,19 @@ class _Scenarios extends StatelessWidget {
                   ),
                 ),
                 const SizedBox(height: 40),
-                Reveal(
-                  visible: revealed,
-                  child: Row(
+                // Cada escenario trae su propia respuesta: al pasar al
+                // siguiente, la vieja se desvanece con su texto y la nueva
+                // no se asoma antes de tiempo.
+                AnimatedSwitcher(
+                  duration: Motion.base,
+                  layoutBuilder: (current, previous) => Stack(
+                    alignment: Alignment.topLeft,
+                    children: [...previous, ?current],
+                  ),
+                  child: !revealed
+                      ? SizedBox(key: ValueKey('pregunta-$index'))
+                      : Row(
+                    key: ValueKey('respuesta-$index'),
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
                       Container(

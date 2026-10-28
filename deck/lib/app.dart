@@ -9,6 +9,7 @@ import 'engine/deck_shell.dart';
 import 'engine/slide.dart';
 import 'live/live_config.dart';
 import 'live/live_controller.dart';
+import 'slides/s09_run.dart' show demoAppPath;
 import 'slides/slides.dart';
 import 'theme/deck_theme.dart';
 import 'theme/tokens.dart';
@@ -45,6 +46,15 @@ class _DeckAppState extends State<DeckApp> {
       step: start?.$2 ?? 0,
     )..addListener(_sync);
     _night = _deck.night;
+    // La app de la demo arranca desde ya, escondida: al llegar a su
+    // diapositiva no hay pantalla en blanco.
+    if (_deck.slides.any((slide) => slide.id == 'demo')) {
+      Future<void>.delayed(const Duration(seconds: 3), () {
+        if (mounted) {
+          widget.browser.preloadApp(demoAppPath, onNext: _deck.next, onPrevious: _deck.previous);
+        }
+      });
+    }
     // El celular del presentador también pasa diapositivas.
     _remote = _live.navigation.listen(
       (direction) => direction == 'next' ? _deck.next() : _deck.previous(),

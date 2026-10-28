@@ -32,6 +32,7 @@
   <title>ecoeats</title>
   <link rel="manifest" href="manifest.json">
   <script>window.removeSplashFromWeb = function () {};</script>
+  <script>(function () { var foco = HTMLElement.prototype.focus; HTMLElement.prototype.focus = function () { if (window.frameElement && window.frameElement.inert) return; return foco.apply(this, arguments); }; var ventana = window.focus; window.focus = function () { if (window.frameElement && window.frameElement.inert) return; return ventana.apply(window, arguments); }; })();</script>
 </head>
 <body>
   <!--
