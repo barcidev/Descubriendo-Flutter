@@ -1,6 +1,8 @@
 import 'package:material_ui/material_ui.dart';
 
 import '../live/live_controller.dart';
+import '../ui/fullscreen_button.dart';
+import 'browser.dart';
 import '../theme/deck_theme.dart';
 import '../theme/tokens.dart';
 import 'deck_controller.dart';
@@ -8,10 +10,16 @@ import 'deck_controller.dart';
 /// La barra del pie, como la de un IDE: rama, comando de la sección,
 /// progreso de la charla, público conectado y versiones.
 class StatusBar extends StatelessWidget {
-  const StatusBar({required this.deck, required this.live, super.key});
+  const StatusBar({
+    required this.deck,
+    required this.live,
+    required this.browser,
+    super.key,
+  });
 
   final DeckController deck;
   final LiveController live;
+  final Browser browser;
 
   @override
   Widget build(BuildContext context) {
@@ -54,6 +62,8 @@ class StatusBar extends StatelessWidget {
                 ),
                 const SizedBox(width: 28),
                 const Text('Flutter 3.47 · Dart 3.13'),
+                const SizedBox(width: 24),
+                FullscreenButton(browser: browser),
               ],
             ),
           ),

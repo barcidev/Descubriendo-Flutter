@@ -1,3 +1,5 @@
+import 'package:flutter/foundation.dart';
+
 import 'browser_stub.dart' if (dart.library.js_interop) 'browser_web.dart'
     as platform;
 
@@ -14,6 +16,10 @@ abstract interface class Browser {
   void replaceHash(String hash);
 
   void toggleFullscreen();
+
+  /// Si la charla está en pantalla completa. Cambia también cuando se sale
+  /// con Esc, sin pasar por la charla.
+  ValueListenable<bool> get fullscreen;
 
   String? read(String key);
 

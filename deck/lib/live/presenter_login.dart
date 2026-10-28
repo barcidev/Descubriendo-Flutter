@@ -1,9 +1,11 @@
 import 'package:material_ui/material_ui.dart';
 
 import '../config.dart';
+import '../engine/browser.dart';
 import '../theme/deck_theme.dart';
 import '../theme/tokens.dart';
 import '../ui/flutter_lockup.dart';
+import '../ui/fullscreen_button.dart';
 import 'join_card.dart';
 import 'live_controller.dart';
 
@@ -12,9 +14,10 @@ import 'live_controller.dart';
 /// WebSocket; el servidor devuelve una sesión que vence sola y queda
 /// guardada en este navegador.
 class PresenterLogin extends StatefulWidget {
-  const PresenterLogin({required this.live, super.key});
+  const PresenterLogin({required this.live, required this.browser, super.key});
 
   final LiveController live;
+  final Browser browser;
 
   @override
   State<PresenterLogin> createState() => _PresenterLoginState();
@@ -164,6 +167,8 @@ class _PresenterLoginState extends State<PresenterLogin> {
                         child: const Text('Presentar sin servidor (mano alzada)'),
                       ),
                     ),
+                    const Spacer(),
+                    FullscreenButton(browser: widget.browser, label: true, size: 30),
                   ],
                 ),
               ],

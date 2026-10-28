@@ -151,7 +151,7 @@ void main() {
       MaterialApp(
         debugShowCheckedModeBanner: false,
         theme: deckTheme(DeckColors.night),
-        home: Stage(child: PresenterLogin(live: live)),
+        home: Stage(child: PresenterLogin(live: live, browser: Browser.current)),
       ),
     );
     await tester.runAsync(() async {

@@ -1,6 +1,10 @@
+import 'package:flutter/foundation.dart';
+
 import 'browser.dart';
 
-Browser createBrowser() => _NoBrowser();
+final _browser = _NoBrowser();
+
+Browser createBrowser() => _browser;
 
 class _NoBrowser implements Browser {
   final _storage = <String, String>{};
@@ -12,7 +16,12 @@ class _NoBrowser implements Browser {
   void replaceHash(String hash) {}
 
   @override
-  void toggleFullscreen() {}
+  void toggleFullscreen() => _fullscreen.value = !_fullscreen.value;
+
+  final _fullscreen = ValueNotifier(false);
+
+  @override
+  ValueListenable<bool> get fullscreen => _fullscreen;
 
   @override
   String? read(String key) => _storage[key];

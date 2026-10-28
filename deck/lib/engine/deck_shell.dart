@@ -199,7 +199,11 @@ class _DeckShellState extends State<DeckShell> {
                     left: 0,
                     right: 0,
                     bottom: 0,
-                    child: StatusBar(deck: _deck, live: widget.live),
+                    child: StatusBar(
+                      deck: _deck,
+                      live: widget.live,
+                      browser: widget.browser,
+                    ),
                   ),
                 if (_deck.qr) const QrOverlay(),
                 if (_deck.overview) Overview(deck: _deck),
@@ -208,7 +212,7 @@ class _DeckShellState extends State<DeckShell> {
                 AnimatedSwitcher(
                   duration: Motion.base,
                   child: _loggingIn
-                      ? PresenterLogin(live: widget.live)
+                      ? PresenterLogin(live: widget.live, browser: widget.browser)
                       : const SizedBox.shrink(),
                 ),
               ],

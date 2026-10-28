@@ -1,13 +1,28 @@
 import 'dart:async';
 import 'dart:js_interop';
 
+import 'package:flutter/foundation.dart';
 import 'package:web/web.dart' as web;
 
 import 'browser.dart';
 
-Browser createBrowser() => _WebBrowser();
+// Uno solo por pestaña: es quien escucha los cambios de pantalla completa.
+final _browser = _WebBrowser();
+
+Browser createBrowser() => _browser;
 
 class _WebBrowser implements Browser {
+  _WebBrowser() {
+    web.document.onfullscreenchange = ((web.Event _) {
+      _fullscreen.value = web.document.fullscreenElement != null;
+    }).toJS;
+  }
+
+  final _fullscreen = ValueNotifier(web.document.fullscreenElement != null);
+
+  @override
+  ValueListenable<bool> get fullscreen => _fullscreen;
+
   @override
   Uri get uri => Uri.parse(web.window.location.href);
 

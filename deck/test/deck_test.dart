@@ -5,6 +5,7 @@ import 'package:deck/live/live_config.dart';
 import 'package:deck/slides/slides.dart';
 import 'package:deck/ui/highlighter.dart';
 import 'package:deck/ui/qr_code.dart';
+import 'package:flutter/foundation.dart';
 import 'package:flutter/widgets.dart';
 import 'package:flutter_test/flutter_test.dart';
 
@@ -31,6 +32,9 @@ class _Browser implements Browser {
 
   @override
   void toggleFullscreen() {}
+
+  @override
+  ValueListenable<bool> get fullscreen => ValueNotifier(false);
 
   @override
   String? read(String key) => storage[key];
