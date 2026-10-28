@@ -29,6 +29,7 @@ class _DeckAppState extends State<DeckApp> {
   late final DeckController _deck;
   late final _live = LiveController(
     config: LiveConfig.resolve(widget.browser),
+    browser: widget.browser,
   )..start();
   late bool _night;
   StreamSubscription<String>? _remote;

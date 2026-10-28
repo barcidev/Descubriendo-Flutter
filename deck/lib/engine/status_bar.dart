@@ -72,9 +72,11 @@ class _LiveStatus extends StatelessWidget {
   Widget build(BuildContext context) {
     final colors = context.colors;
     final on = live.online || live.simulating;
-    final label = switch ((live.online, live.simulating)) {
-      (true, _) => '${live.connected} conectados',
-      (false, true) => '${live.connected} conectados (ensayo)',
+    final label = switch ((live.access, live.online, live.simulating)) {
+      (_, true, _) => '${live.connected} conectados',
+      (_, false, true) => '${live.connected} conectados (ensayo)',
+      (PresenterAccess.granted, false, _) => 'reconectando…',
+      (PresenterAccess.login || PresenterAccess.checking, _, _) => 'sin sesión de presentador',
       _ => 'sin servidor · mano alzada',
     };
     return Row(

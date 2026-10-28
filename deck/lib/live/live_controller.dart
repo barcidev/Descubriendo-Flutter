@@ -5,8 +5,24 @@ import 'dart:math' as math;
 import 'package:flutter/foundation.dart';
 import 'package:web_socket_channel/web_socket_channel.dart';
 
+import '../engine/browser.dart';
 import 'live_config.dart';
 import 'live_models.dart';
+
+/// Cómo está la charla frente al servidor de votaciones.
+enum PresenterAccess {
+  /// Sin servidor, o el presentador eligió presentar a mano alzada.
+  none,
+
+  /// Hay servidor, pero falta escribir el token del presentador.
+  login,
+
+  /// Revisando el token o la sesión guardada.
+  checking,
+
+  /// Modo presentador: la charla maneja los celulares.
+  granted,
+}
 
 /// El lado de la charla en la conversación con los celulares.
 ///
@@ -14,9 +30,14 @@ import 'live_models.dart';
 /// votaciones pasan a «mano alzada» y los conteos se suman con el teclado.
 /// Para ensayar sin público hay un modo de audiencia simulada.
 class LiveController extends ChangeNotifier {
-  LiveController({this.config = const LiveConfig()});
+  LiveController({this.config = const LiveConfig(), this.browser});
 
   final LiveConfig config;
+
+  /// Donde se guarda la sesión del presentador entre recargas.
+  final Browser? browser;
+
+  static const _sessionKey = 'charla.sesion';
 
   /// La dirección que se muestra junto al QR.
   String get joinUrl => config.joinUrl;
@@ -28,7 +49,10 @@ class LiveController extends ChangeNotifier {
   int _attempts = 0;
   bool _disposed = false;
 
-  bool _online = false;
+  bool _socketOpen = false;
+  PresenterAccess _access = PresenterAccess.none;
+  String? _loginError;
+  String? _pendingToken;
   int _connected = 0;
   AudienceCue _cue = const AudienceCue.idle();
   final _serverResults = <String, PollResults>{};
@@ -44,7 +68,16 @@ class LiveController extends ChangeNotifier {
   final _navigation = StreamController<String>.broadcast();
   Map<String, Object?> _slide = const {};
 
-  bool get online => _online;
+  /// Conectado y con el modo presentador concedido.
+  bool get online => _socketOpen && _access == PresenterAccess.granted;
+
+  PresenterAccess get access => _access;
+
+  /// Por qué no se pudo entrar la última vez.
+  String? get loginError => _loginError;
+
+  /// El WebSocket está abierto (el servidor gratis puede tardar en despertar).
+  bool get socketOpen => _socketOpen;
   bool get simulating => _simulation != null;
   AudienceCue get cue => _cue;
 
@@ -75,9 +108,63 @@ class LiveController extends ChangeNotifier {
         _manualResults[pollId] ?? PollResults.empty,
       );
 
-  /// Empieza a hablar con el servidor, si hay uno configurado.
+  String? get _session {
+    final stored = browser?.read(_sessionKey);
+    return stored == null || stored.isEmpty ? null : stored;
+  }
+
+  set _session(String? value) => browser?.write(_sessionKey, value ?? '');
+
+  /// Empieza a hablar con el servidor, si hay uno configurado. Con una
+  /// sesión guardada entra sola; si no, la charla pide el token.
   void start() {
-    if (config.enabled) _connect();
+    if (!config.enabled) return;
+    _access = _session == null ? PresenterAccess.login : PresenterAccess.checking;
+    _connect();
+  }
+
+  /// El presentador escribió el token. Si el servidor todavía está
+  /// despertando, sale apenas se abra la conexión.
+  void login(String token) {
+    if (token.isEmpty) return;
+    _access = PresenterAccess.checking;
+    _loginError = null;
+    if (_socketOpen) {
+      _send({'t': 'login', 'token': token});
+    } else {
+      _pendingToken = token;
+    }
+    notifyListeners();
+  }
+
+  /// Presentar sin servidor: las votaciones quedan a mano alzada.
+  void skipLogin() {
+    _access = PresenterAccess.none;
+    _pendingToken = null;
+    _reconnect?.cancel();
+    _heartbeat?.cancel();
+    final channel = _channel;
+    _channel = null;
+    _socketOpen = false;
+    unawaited(_subscription?.cancel());
+    unawaited(channel?.sink.close());
+    notifyListeners();
+  }
+
+  /// Cierra la sesión en esta máquina y vuelve a pedir el token.
+  void logout() {
+    if (!config.enabled) return;
+    _session = null;
+    _loginError = null;
+    if (_access == PresenterAccess.none) {
+      _access = PresenterAccess.login;
+      _connect();
+    } else {
+      _access = PresenterAccess.login;
+      // Una conexión nueva entra como público, sin el rol anterior.
+      unawaited(_channel?.sink.close());
+    }
+    notifyListeners();
   }
 
   void _connect() {
@@ -94,9 +181,16 @@ class LiveController extends ChangeNotifier {
     channel.ready.then((_) {
       if (_channel != channel) return;
       _attempts = 0;
-      _online = true;
-      _send({'t': 'cue', 'cue': _cue.toJson()});
-      if (_slide.isNotEmpty) _send({'t': 'diapositiva', ..._slide});
+      _socketOpen = true;
+      // El token o la sesión van dentro del WebSocket, nunca en la URL.
+      if (_pendingToken case final token?) {
+        _pendingToken = null;
+        _send({'t': 'login', 'token': token});
+      } else if (_session case final session?) {
+        _send({'t': 'auth', 'sesion': session});
+      } else if (_access != PresenterAccess.none) {
+        _access = PresenterAccess.login;
+      }
       // Un latido cada 20 s: detecta conexiones muertas y mantiene
       // despierto al servidor del plan gratis.
       _heartbeat?.cancel();
@@ -109,12 +203,13 @@ class LiveController extends ChangeNotifier {
   }
 
   void _onClosed() {
-    if (_disposed) return;
+    if (_disposed || _access == PresenterAccess.none) return;
     _heartbeat?.cancel();
     unawaited(_subscription?.cancel());
     _channel = null;
-    if (_online) {
-      _online = false;
+    if (_socketOpen) {
+      // El modo presentador se conserva: al reconectar, entra con la sesión.
+      _socketOpen = false;
       notifyListeners();
     }
     _reconnect?.cancel();
@@ -138,6 +233,10 @@ class LiveController extends ChangeNotifier {
     if (json is! Map<String, Object?>) return;
     if (json case {'t': 'nav', 'dir': final String direction}) {
       _navigation.add(direction);
+      return;
+    }
+    if (json['t'] == 'acceso') {
+      _onAccess(json);
       return;
     }
     if (json['t'] != 'estado') return;
@@ -171,6 +270,27 @@ class LiveController extends ChangeNotifier {
     notifyListeners();
   }
 
+  void _onAccess(Map<String, Object?> answer) {
+    if (answer['ok'] == true) {
+      if (answer['sesion'] case final String session) _session = session;
+      _access = PresenterAccess.granted;
+      _loginError = null;
+      _send({'t': 'cue', 'cue': _cue.toJson()});
+      if (_slide.isNotEmpty) _send({'t': 'diapositiva', ..._slide});
+    } else {
+      _access = PresenterAccess.login;
+      _loginError = switch (answer['error']) {
+        'clave' => 'Token incorrecto. Te quedan ${answer['restantes']} intentos.',
+        'bloqueado' => 'Demasiados intentos. Espera ${answer['espera']} s.',
+        'sin-clave' => 'El servidor no tiene token configurado (PRESENTER_TOKEN).',
+        'sesion' => 'La sesión venció. Escribe el token otra vez.',
+        _ => 'No se pudo entrar.',
+      };
+      if (answer['error'] == 'sesion') _session = null;
+    }
+    notifyListeners();
+  }
+
   /// En qué diapositiva vamos, para el guion en el celular del presentador.
   void setSlide({
     required String id,
@@ -188,14 +308,14 @@ class LiveController extends ChangeNotifier {
       'paso': step,
       'pasos': steps,
     };
-    _send({'t': 'diapositiva', ..._slide});
+    if (_access == PresenterAccess.granted) _send({'t': 'diapositiva', ..._slide});
   }
 
   /// Lo que deben mostrar los celulares ahora.
   void setCue(AudienceCue cue) {
     if (cue == _cue) return;
     _cue = cue;
-    _send({'t': 'cue', 'cue': cue.toJson()});
+    if (_access == PresenterAccess.granted) _send({'t': 'cue', 'cue': cue.toJson()});
     notifyListeners();
   }
 
@@ -238,7 +358,7 @@ class LiveController extends ChangeNotifier {
   ];
 
   void _simulate(math.Random random) {
-    if (!_online && _connected < 64) _connected += random.nextInt(4);
+    if (!online && _connected < 64) _connected += random.nextInt(4);
     final poll = _cue.poll;
     if (_cue.mode == AudienceMode.poll && poll != null && _cue.open) {
       final current = _manualResults[poll.id] ?? PollResults.empty;

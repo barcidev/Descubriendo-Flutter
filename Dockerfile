@@ -16,6 +16,7 @@ FROM scratch
 COPY --from=build /runtime/ /
 COPY --from=build /app/bin/server /app/bin/server
 COPY --from=build /app/public/ /app/public/
+COPY --from=build /app/privado/ /app/privado/
 COPY --from=build /app/deck_web/ /app/deck_web/
 WORKDIR /app
 EXPOSE 8080

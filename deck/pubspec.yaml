@@ -10,6 +10,8 @@ environment:
 dependencies:
   flutter:
     sdk: flutter
+  flutter_web_plugins:
+    sdk: flutter
   http: ^1.6.0
   material_ui: ^1.8.0
   qr: ^3.0.2

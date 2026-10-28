@@ -7,7 +7,7 @@ Charla del 28 de octubre de 2026, 6:00 p. m., Universidad Autónoma del Caribe.
 | `deck/` | La presentación: una app de Flutter Web (41 diapositivas). |
 | `servidor/` | Las votaciones en vivo: servidor en Dart (shelf + WebSocket), la página del celular, la página de moderación y el guion. |
 | `contador/` | La plantilla de `flutter create` con 10 líneas más: escucha los toques del público. Es para el hot reload en vivo. |
-| `GUION.md` | Las notas de cada diapositiva. La misma información sale en el celular, en `/moderar/`. |
+| `GUION.md` | Copia para imprimir de las notas de cada diapositiva. La fuente es `servidor/privado/guion.md`, que solo se entrega a quien entra con el token. |
 | `FUENTES.md` | De dónde sale cada dato de la charla. |
 
 ## 1. Un solo repositorio con todo
@@ -35,7 +35,7 @@ render workspace set tea-dbgq713bc2fs73bco4pg   # My Workspace
 render services create --name flutter-baq --type web_service \
   --repo https://github.com/TU_USUARIO/descubriendo-flutter --branch main \
   --runtime docker --plan free --region virginia --health-check-path /health \
-  --env-var PRESENTER_TOKEN=TU_TOKEN --output json
+  --env-var PRESENTER_TOKEN=TU_TOKEN --output json   # o sin esta línea, y lo pones en el dashboard
 ```
 
 Otra opción es el dashboard: **New → Blueprint**, eliges el repositorio y Render lee `render.yaml` (`render blueprints validate render.yaml` ya lo da por válido). Ahí te pide el `PRESENTER_TOKEN`.
@@ -51,13 +51,21 @@ El plan gratis se duerme a los 15 minutos sin tráfico y tarda alrededor de un m
 Opción recomendada, desde el portátil (las diapositivas funcionan aunque se caiga internet):
 
 ```sh
-./presentar.sh https://flutter-baq.onrender.com TU_TOKEN
+./presentar.sh https://flutter-baq.onrender.com
 ```
 
-Respaldo, desde cualquier computador: `https://flutter-baq.onrender.com/deck/?token=TU_TOKEN`.
+Respaldo, desde cualquier computador: `https://flutter-baq.onrender.com/deck/`.
 
-En el celular del presentador abre `https://flutter-baq.onrender.com/moderar/?token=TU_TOKEN`. Ahí tienes:
-- el guion de la diapositiva actual;
+**Login del presentador.** La charla abre en la pantalla «Modo presentador» y pide el token una sola vez:
+- El token viaja dentro del WebSocket cifrado, nunca en la URL.
+- El servidor responde con una sesión firmada que vence a las 18 horas. Al recargar, la charla entra sola con esa sesión.
+- 5 intentos fallidos desde la misma IP bloquean un minuto.
+- Si cambias el token en Render, todas las sesiones dejan de valer.
+- «Presentar sin servidor» deja la charla en mano alzada.
+- La tecla **L** cierra la sesión en ese navegador.
+
+En el celular del presentador abre `https://flutter-baq.onrender.com/moderar/`, escribe el mismo token y tienes:
+- el guion de la diapositiva actual, que solo se entrega después de entrar;
 - los botones Anterior y Siguiente, que sirven de control remoto;
 - la moderación de excusas y preguntas.
 
@@ -66,11 +74,11 @@ Nada de lo que escribe el público sale en pantalla sin que lo apruebes.
 ## 4. Ensayar sin público
 
 ```sh
-cd servidor && fvm dart run bin/server.dart                      # http://localhost:8080 (token: ensayo)
+cd servidor && PRESENTER_TOKEN=ensayo fvm dart run bin/server.dart   # http://localhost:8080
 fvm dart run tool/simular_audiencia.dart --clientes 80           # en otra terminal
 ```
 
-Abre `http://localhost:8080/deck/` (se conecta solo) y `http://localhost:8080/moderar/?token=ensayo` en el celular o en otra pestaña.
+Abre `http://localhost:8080/deck/` y `http://localhost:8080/moderar/`, y entra con el token `ensayo`. Sin `PRESENTER_TOKEN`, el servidor no deja entrar a nadie como presentador.
 
 Sin servidor también se ensaya: la tecla **S** activa un público de ensayo local.
 
@@ -97,8 +105,8 @@ EcoEats ya está en el simulador iPhone 16e con la sesión iniciada: no lo cierr
 - **T−60 min:** carga el portátil. Prueba HDMI y que la resolución sea 1920×1080. Activa No molestar.
 - **T−30 min:**
   - Abre `/health` para despertar el servidor.
-  - Corre `./presentar.sh …` y pon Chrome en pantalla completa (tecla **F**).
-  - Abre `/moderar/` en el celular.
+  - Corre `./presentar.sh …`, escribe el token antes de conectar el proyector y pon Chrome en pantalla completa (tecla **F**).
+  - Abre `/moderar/` en el celular y entra con el mismo token.
   - Deja corriendo `contador` en el simulador y EcoEats en el emulador.
 - **T−15 min:** deja la diapositiva 1 (el doctor y el QR) mientras la gente entra. Escanea tú primero para probar.
 - **Plan B sin internet:** la charla sigue. Las votaciones pasan a mano alzada: las teclas 1–9 suman votos.
@@ -116,5 +124,6 @@ EcoEats ya está en el simulador iPhone 16e con la sesión iniciada: no lo cierr
 | O | vista general |
 | G + número + Enter | ir a una diapositiva |
 | R | ocultar o mostrar las reacciones |
+| L | cerrar la sesión de presentador en este navegador |
 | S | público de ensayo |
 | 1–9 | mano alzada (con Shift resta) |

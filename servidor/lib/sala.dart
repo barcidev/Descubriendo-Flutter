@@ -8,11 +8,14 @@ typedef Reloj = DateTime Function();
 /// Una conexión abierta: un celular del público o el presentador.
 class Conexion {
   Conexion({required this.enviar, required this.presentador, Reloj? reloj})
-    : _toques = Cubeta(capacidad: 60, porSegundo: 30, reloj: reloj),
-      _reacciones = Cubeta(capacidad: 6, porSegundo: 3, reloj: reloj);
+      : _toques = Cubeta(capacidad: 60, porSegundo: 30, reloj: reloj),
+        _reacciones = Cubeta(capacidad: 6, porSegundo: 3, reloj: reloj);
 
   final void Function(String mensaje) enviar;
-  final bool presentador;
+
+  /// Toda conexión entra como público; pasa a presentador al escribir la
+  /// clave correcta (ver Llave).
+  bool presentador;
 
   /// El id que el celular guarda en su almacenamiento: sobrevive a las
   /// reconexiones, así que nadie vota dos veces recargando la página.
@@ -25,8 +28,8 @@ class Conexion {
 /// Límite de ritmo: se llena con el tiempo y cada acción gasta fichas.
 class Cubeta {
   Cubeta({required this.capacidad, required this.porSegundo, Reloj? reloj})
-    : _reloj = reloj ?? DateTime.now,
-      _fichas = capacidad.toDouble();
+      : _reloj = reloj ?? DateTime.now,
+        _fichas = capacidad.toDouble();
 
   final int capacidad;
   final double porSegundo;
@@ -67,18 +70,18 @@ class Texto {
   final apoyos = <String>{};
 
   Map<String, Object?> publica() => {
-    'id': id,
-    'text': texto,
-    'author': autor,
-    'votes': apoyos.length,
-    'done': respondida,
-  };
+        'id': id,
+        'text': texto,
+        'author': autor,
+        'votes': apoyos.length,
+        'done': respondida,
+      };
 
   Map<String, Object?> completa() => {
-    ...publica(),
-    'approved': aprobada,
-    'hidden': oculta,
-  };
+        ...publica(),
+        'approved': aprobada,
+        'hidden': oculta,
+      };
 }
 
 const _modos = {'idle', 'poll', 'counter', 'excuse', 'questions', 'rating'};
@@ -95,7 +98,11 @@ class Sala {
 
   final _audiencia = <Conexion>{};
   final _presentadores = <Conexion>{};
-  Map<String, Object?> _cue = const {'mode': 'idle', 'open': false, 'revealed': false};
+  Map<String, Object?> _cue = const {
+    'mode': 'idle',
+    'open': false,
+    'revealed': false
+  };
 
   /// Por encuesta: lo que marcó cada cliente.
   final _votos = <String, Map<String, List<String>>>{};
@@ -125,6 +132,16 @@ class Sala {
     if (conexion.presentador) {
       conexion.enviar(jsonEncode(_estadoPresentador(const {})));
     }
+    _cambio = true;
+  }
+
+  /// La clave fue correcta: la conexión pasa a ser del presentador.
+  void promover(Conexion conexion) {
+    if (conexion.presentador) return;
+    _audiencia.remove(conexion);
+    conexion.presentador = true;
+    _presentadores.add(conexion);
+    conexion.enviar(jsonEncode(_estadoPresentador(const {})));
     _cambio = true;
   }
 
@@ -176,9 +193,9 @@ class Sala {
 
   /// Las excusas que ya pasaron la moderación, para la demo de FutureBuilder.
   List<Map<String, Object?>> excusasAprobadas() => [
-    for (final excusa in _excusas.reversed)
-      if (excusa.aprobada && !excusa.oculta) excusa.publica(),
-  ];
+        for (final excusa in _excusas.reversed)
+          if (excusa.aprobada && !excusa.oculta) excusa.publica(),
+      ];
 
   void _publico(Conexion conexion, Map<String, Object?> json) {
     final tipo = json['t'];
@@ -223,7 +240,8 @@ class Sala {
         if (modo != 'excuse') return;
         _escribir(_excusas, cliente, json['texto'], maximo: 140, porPersona: 3);
       case 'pregunta':
-        _escribir(_preguntas, cliente, json['texto'], maximo: 200, porPersona: 5);
+        _escribir(_preguntas, cliente, json['texto'],
+            maximo: 200, porPersona: 5);
       case 'apoyo':
         final pregunta = _buscar(_preguntas, json['id']);
         if (pregunta != null && pregunta.aprobada && !pregunta.oculta) {
@@ -238,7 +256,10 @@ class Sala {
         }
       case 'estrellas':
         final estrellas = json['n'];
-        if (modo == 'rating' && estrellas is int && estrellas >= 1 && estrellas <= 5) {
+        if (modo == 'rating' &&
+            estrellas is int &&
+            estrellas >= 1 &&
+            estrellas <= 5) {
           _estrellas[cliente] = estrellas;
           _cambio = true;
         }
@@ -289,13 +310,15 @@ class Sala {
     switch (json['t']) {
       case 'cue':
         final cue = json['cue'];
-        if (cue is! Map<String, Object?> || !_modos.contains(cue['mode'])) return;
+        if (cue is! Map<String, Object?> || !_modos.contains(cue['mode']))
+          return;
         final poll = cue['poll'];
         if (poll is Map<String, Object?> && poll['id'] is String) {
           final id = poll['id']! as String;
           _opciones[id] = [
             for (final opcion in (poll['options'] as List?) ?? const [])
-              if (opcion is Map && opcion['id'] is String) opcion['id'] as String,
+              if (opcion is Map && opcion['id'] is String)
+                opcion['id'] as String,
           ];
           _multiple[id] = poll['multiple'] == true;
         }
@@ -317,8 +340,16 @@ class Sala {
         _cambio = true;
       case 'diapositiva':
         _diapositiva = {
-          for (final clave in const ['id', 'titulo', 'indice', 'total', 'paso', 'pasos'])
-            if (json[clave] case final valor? when valor is String || valor is int)
+          for (final clave in const [
+            'id',
+            'titulo',
+            'indice',
+            'total',
+            'paso',
+            'pasos'
+          ])
+            if (json[clave] case final valor?
+                when valor is String || valor is int)
               clave: valor,
         };
         _cambio = true;
@@ -367,7 +398,8 @@ class Sala {
       'total': total,
       if (distribucion)
         'distribution': [
-          for (var n = 1; n <= 5; n++) _estrellas.values.where((e) => e == n).length,
+          for (var n = 1; n <= 5; n++)
+            _estrellas.values.where((e) => e == n).length,
         ],
     };
   }
@@ -394,17 +426,17 @@ class Sala {
   }
 
   Map<String, Object?> _estadoPresentador(Map<String, int> reacciones) => {
-    't': 'estado',
-    'cue': _cue,
-    'connected': conectados,
-    'counter': _contador,
-    'polls': {for (final id in _votos.keys) id: _resultados(id)},
-    'excuses': [for (final excusa in _excusas) excusa.completa()],
-    'questions': [for (final pregunta in _preguntas) pregunta.completa()],
-    'rating': _estrellasResumen(distribucion: true),
-    'reactions': reacciones,
-    'slide': _diapositiva,
-  };
+        't': 'estado',
+        'cue': _cue,
+        'connected': conectados,
+        'counter': _contador,
+        'polls': {for (final id in _votos.keys) id: _resultados(id)},
+        'excuses': [for (final excusa in _excusas) excusa.completa()],
+        'questions': [for (final pregunta in _preguntas) pregunta.completa()],
+        'rating': _estrellasResumen(distribucion: true),
+        'reactions': reacciones,
+        'slide': _diapositiva,
+      };
 }
 
 /// Una línea sin caracteres de control ni espacios de más, recortada.

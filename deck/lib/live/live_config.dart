@@ -1,19 +1,21 @@
 import '../config.dart';
 import '../engine/browser.dart';
 
-/// Dónde está el servidor de votaciones y con qué token se entra.
+/// Dónde está el servidor de votaciones.
 ///
 /// Se resuelve al abrir la charla, sin recompilar:
-///   1. `?servidor=https://…&token=…` en la URL (y se recuerda),
+///   1. `?servidor=https://…` en la URL (y se recuerda),
 ///   2. lo que se recordó la vez pasada,
 ///   3. `--dart-define=SERVIDOR=…`,
 ///   4. el mismo origen, si el servidor sirve la charla en `/deck/`.
 /// `?servidor=` vacío olvida el servidor: modo mano alzada.
+///
+/// El token del presentador no pasa por aquí: se escribe en la pantalla de
+/// entrada y viaja dentro del WebSocket, nunca en la URL.
 class LiveConfig {
-  const LiveConfig({this.server, this.token});
+  const LiveConfig({this.server});
 
   final Uri? server;
-  final String? token;
 
   bool get enabled => server != null;
 
@@ -33,21 +35,16 @@ class LiveConfig {
           host: server!.host,
           port: server!.hasPort ? server!.port : null,
           path: '/ws',
-          queryParameters: {'rol': 'presentador', 'token': ?token},
         );
 
   Uri? get excuses => server?.replace(path: '/excusas', query: '');
 
   static const _serverKey = 'charla.servidor';
-  static const _tokenKey = 'charla.token';
 
   static LiveConfig resolve(Browser browser) {
     final uri = browser.uri;
     final query = uri.queryParameters;
     if (query.containsKey('servidor')) browser.write(_serverKey, query['servidor']!);
-    if (query['token'] case final token? when token.isNotEmpty) {
-      browser.write(_tokenKey, token);
-    }
     final stored = browser.read(_serverKey);
     final address = query['servidor'] ??
         stored ??
@@ -61,6 +58,6 @@ class LiveConfig {
         port: uri.hasPort ? uri.port : null,
       );
     }
-    return LiveConfig(server: server, token: browser.read(_tokenKey));
+    return LiveConfig(server: server);
   }
 }

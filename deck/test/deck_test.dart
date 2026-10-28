@@ -140,14 +140,14 @@ void main() {
   });
 
   group('LiveConfig', () {
-    test('toma el servidor y el token de la URL y los recuerda', () {
+    test('toma el servidor de la URL y lo recuerda; el token nunca va en la URL', () {
       final browser = _Browser(
-        'http://127.0.0.1:8090/?servidor=https://flutter-baq.onrender.com&token=secreto#/1/1',
+        'http://127.0.0.1:8090/?servidor=https://flutter-baq.onrender.com#/1/1',
       );
       final config = LiveConfig.resolve(browser);
       expect(config.joinUrl, 'https://flutter-baq.onrender.com');
-      expect(config.socket.toString(), 'wss://flutter-baq.onrender.com/ws?rol=presentador&token=secreto');
-      expect(browser.storage['charla.token'], 'secreto');
+      expect(config.socket.toString(), 'wss://flutter-baq.onrender.com/ws');
+      expect(browser.storage['charla.servidor'], 'https://flutter-baq.onrender.com');
     });
 
     test('servida en /deck/, usa su propio origen', () {

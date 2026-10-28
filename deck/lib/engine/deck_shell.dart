@@ -3,6 +3,7 @@ import 'package:material_ui/material_ui.dart';
 
 import '../live/join_card.dart';
 import '../live/live_controller.dart';
+import '../live/presenter_login.dart';
 import '../live/reactions_layer.dart';
 import '../theme/deck_theme.dart';
 import '../theme/tokens.dart';
@@ -71,8 +72,14 @@ class _DeckShellState extends State<DeckShell> {
   bool _typing() =>
       FocusManager.instance.primaryFocus?.context?.widget is EditableText;
 
+  bool get _loggingIn => const {
+    PresenterAccess.login,
+    PresenterAccess.checking,
+  }.contains(widget.live.access);
+
   bool _onKey(KeyEvent event) {
-    if (event is KeyUpEvent || _typing()) return false;
+    // Mientras se pide el token, el teclado es del formulario.
+    if (event is KeyUpEvent || _typing() || _loggingIn) return false;
     final key = event.logicalKey;
     final repeat = event is KeyRepeatEvent;
 
@@ -116,6 +123,8 @@ class _DeckShellState extends State<DeckShell> {
         _deck.toggleQr();
       case LogicalKeyboardKey.keyR:
         _deck.toggleReactions();
+      case LogicalKeyboardKey.keyL:
+        widget.live.logout();
       case LogicalKeyboardKey.keyG:
         setState(() => _goTo = '');
       case LogicalKeyboardKey.escape:
@@ -175,7 +184,7 @@ class _DeckShellState extends State<DeckShell> {
   Widget build(BuildContext context) {
     return Stage(
       child: ListenableBuilder(
-        listenable: _deck,
+        listenable: Listenable.merge([_deck, widget.live]),
         builder: (context, _) {
           final colors = context.colors;
           return DefaultTextStyle(
@@ -196,6 +205,12 @@ class _DeckShellState extends State<DeckShell> {
                 if (_deck.overview) Overview(deck: _deck),
                 if (_goTo != null) _GoToBox(typed: _goTo!, total: _deck.slides.length),
                 if (_deck.paused) const _Curtain(),
+                AnimatedSwitcher(
+                  duration: Motion.base,
+                  child: _loggingIn
+                      ? PresenterLogin(live: widget.live)
+                      : const SizedBox.shrink(),
+                ),
               ],
             ),
           );

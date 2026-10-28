@@ -1,7 +1,7 @@
 # Guion · Descubriendo Flutter
 
 Tiempo total: 45 minutos. Cada sección es un comando de Flutter.
-Teclas: → siguiente · ← anterior · Q QR gigante · X rayos X · T tema · S público de ensayo · 1–9 mano alzada · B pausa · O vista general · G ir a.
+Teclas: → siguiente · ← anterior · Q QR gigante · X rayos X · T tema · S público de ensayo · 1–9 mano alzada · B pausa · O vista general · G ir a · L cerrar sesión.
 
 ## doctor · Antes de empezar, un chequeo · mientras la gente llega
 - Déjala proyectada mientras entran. La terminal hace el «flutter doctor» de la sala.

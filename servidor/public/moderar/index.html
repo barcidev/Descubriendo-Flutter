@@ -48,9 +48,11 @@
     <span>moderación</span>
   </header>
   <main>
-    <form id="acceso">
-      <input id="token" type="password" placeholder="Token del presentador" autocomplete="off">
+    <form id="acceso" hidden>
+      <h2 style="margin:0">Modo presentador</h2>
+      <input id="token" type="password" placeholder="Token del presentador" autocomplete="current-password">
       <button class="boton" type="submit">Entrar</button>
+      <p class="nota" id="notaAcceso"></p>
     </form>
 
     <section id="panel" hidden>
@@ -75,6 +77,7 @@
       <div class="grupo"><h2>Preguntas en pantalla</h2><ul class="lista" id="preguntasAprobadas"></ul></div>
       <div class="grupo"><h2>Excusas en pantalla</h2><ul class="lista" id="excusasAprobadas"></ul></div>
       <button class="boton" id="reiniciar" type="button">Reiniciar el contador</button>
+      <button class="boton" id="salir" type="button" style="background:var(--raised)">Cerrar sesión en este celular</button>
     </section>
   </main>
 
@@ -84,37 +87,90 @@
     (() => {
       const $ = (id) => document.getElementById(id);
       let socket = null;
+      let reintentos = 0;
+      const CLAVE_SESION = 'charla.sesion';
+      const leerSesion = () => { try { return localStorage.getItem(CLAVE_SESION); } catch { return null; } };
+      const guardarSesion = (valor) => {
+        try { valor ? localStorage.setItem(CLAVE_SESION, valor) : localStorage.removeItem(CLAVE_SESION); } catch { /* sin almacenamiento */ }
+      };
 
-      const token = new URLSearchParams(location.search).get('token') || localStorage.getItem('charla.token') || '';
-      $('token').value = token;
-      if (token) conectar(token);
+      // El token nunca va en la URL: se escribe aquí y viaja dentro del
+      // WebSocket cifrado. El servidor responde con una sesión firmada que
+      // vence sola; con ella este celular reconecta sin volver a pedirlo.
+      function conectar() {
+        const protocolo = location.protocol === 'https:' ? 'wss' : 'ws';
+        socket = new WebSocket(`${protocolo}://${location.host}/ws`);
+        socket.onopen = () => {
+          reintentos = 0;
+          const sesion = leerSesion();
+          if (sesion) {
+            enviar({ t: 'auth', sesion });
+            marcar(false, 'verificando…');
+          } else {
+            pedirToken('');
+          }
+        };
+        socket.onmessage = (evento) => {
+          const mensaje = JSON.parse(evento.data);
+          if (mensaje.t === 'acceso') acceso(mensaje);
+          else if (mensaje.t === 'guion') cargarGuion(mensaje.texto || '');
+          else if (mensaje.t === 'estado') pintar(mensaje);
+        };
+        socket.onclose = () => {
+          marcar(false, 'reconectando…');
+          setTimeout(conectar, Math.min(1000 * 2 ** reintentos++, 8000));
+        };
+      }
+
+      function marcar(vivo, texto) {
+        $('punto').classList.toggle('vivo', vivo);
+        $('estado').textContent = texto;
+      }
+
+      function pedirToken(nota) {
+        marcar(false, 'sin sesión');
+        $('panel').hidden = true;
+        $('acceso').hidden = false;
+        $('notaAcceso').textContent = nota;
+        $('token').focus();
+      }
+
+      function acceso(respuesta) {
+        if (respuesta.ok) {
+          if (respuesta.sesion) guardarSesion(respuesta.sesion);
+          $('token').value = '';
+          $('acceso').hidden = true;
+          $('panel').hidden = false;
+          marcar(true, 'en vivo');
+          return;
+        }
+        if (respuesta.error === 'sesion') {
+          guardarSesion(null);
+          pedirToken('Tu sesión venció. Escribe el token otra vez.');
+          return;
+        }
+        const notas = {
+          clave: `Token incorrecto. Te quedan ${respuesta.restantes} intentos.`,
+          bloqueado: `Demasiados intentos. Espera ${respuesta.espera} s y vuelve a probar.`,
+          'sin-clave': 'El servidor no tiene token configurado (PRESENTER_TOKEN).',
+        };
+        pedirToken(notas[respuesta.error] || 'No se pudo entrar.');
+      }
 
       $('acceso').addEventListener('submit', (evento) => {
         evento.preventDefault();
-        conectar($('token').value.trim());
+        const token = $('token').value;
+        if (!token) return;
+        enviar({ t: 'login', token });
+        $('notaAcceso').textContent = 'Verificando…';
       });
 
-      function conectar(clave) {
-        if (!clave) return;
-        try { localStorage.setItem('charla.token', clave); } catch { /* sin almacenamiento */ }
-        const protocolo = location.protocol === 'https:' ? 'wss' : 'ws';
-        socket = new WebSocket(`${protocolo}://${location.host}/ws?rol=presentador&token=${encodeURIComponent(clave)}`);
-        socket.onopen = () => {
-          $('punto').classList.add('vivo');
-          $('estado').textContent = 'en vivo';
-          $('acceso').hidden = true;
-          $('panel').hidden = false;
-        };
-        socket.onmessage = (evento) => {
-          const estado = JSON.parse(evento.data);
-          if (estado.t === 'estado') pintar(estado);
-        };
-        socket.onclose = () => {
-          $('punto').classList.remove('vivo');
-          $('estado').textContent = 'desconectado: revisa el token';
-          setTimeout(() => conectar(clave), 3000);
-        };
-      }
+      $('salir').addEventListener('click', () => {
+        guardarSesion(null);
+        socket.close();
+      });
+
+      conectar();
 
       const enviar = (mensaje) => socket && socket.readyState === 1 && socket.send(JSON.stringify(mensaje));
 
@@ -143,8 +199,10 @@
       }
 
       // El guion: «## id · Título · tiempo» y debajo las notas en viñetas.
+      // Llega por el WebSocket solo después de entrar: no es un archivo público.
       let guion = [];
-      fetch('/moderar/guion.md').then((r) => r.text()).then((texto) => {
+      function cargarGuion(texto) {
+        guion = [];
         let actual = null;
         for (const linea of texto.split('\n')) {
           if (linea.startsWith('## ')) {
@@ -155,7 +213,7 @@
             actual.notas.push(linea.slice(2));
           }
         }
-      });
+      }
 
       function pintarGuion(diapositiva) {
         if (!diapositiva || !diapositiva.id) return;

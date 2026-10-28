@@ -10,6 +10,11 @@ import 'dart:ui' as ui;
 import 'package:deck/app.dart';
 import 'package:deck/engine/browser.dart';
 import 'package:deck/engine/deck_shell.dart';
+import 'package:deck/engine/stage.dart';
+import 'package:deck/live/live_config.dart';
+import 'package:deck/live/live_controller.dart';
+import 'package:deck/live/presenter_login.dart';
+import 'package:deck/theme/deck_theme.dart';
 import 'package:deck/slides/slides.dart';
 import 'package:flutter/rendering.dart';
 import 'package:flutter/services.dart';
@@ -132,5 +137,31 @@ void main() {
     await _key(tester, LogicalKeyboardKey.keyS);
     await tester.pumpWidget(const SizedBox());
     await _wait(tester, 300);
+  });
+
+  testWidgets('pantalla de entrada del presentador', (tester) async {
+    tester.view.physicalSize = const Size(1920, 1080);
+    tester.view.devicePixelRatio = 1;
+    addTearDown(tester.view.reset);
+    final live = LiveController(
+      config: LiveConfig(server: Uri.parse('https://flutter-baq.onrender.com')),
+    );
+    addTearDown(live.dispose);
+    await tester.pumpWidget(
+      MaterialApp(
+        debugShowCheckedModeBanner: false,
+        theme: deckTheme(DeckColors.night),
+        home: Stage(child: PresenterLogin(live: live)),
+      ),
+    );
+    await tester.runAsync(() async {
+      await precacheImage(
+        const AssetImage('assets/brand/flutter_lockup_white.png'),
+        tester.element(find.byType(PresenterLogin)),
+      );
+    });
+    await tester.enterText(find.byType(TextField), 'secreto');
+    await _wait(tester, 600);
+    await _shot(tester, 'login-presentador');
   });
 }
