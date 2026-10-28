@@ -1,0 +1,19 @@
+# Blueprint de Render: el servidor de votaciones de la charla.
+# Equivale a: render services create (ver PREPARACION.md).
+services:
+  - type: web
+    name: flutter-baq
+    runtime: docker
+    plan: free
+    region: virginia
+    dockerfilePath: ./Dockerfile
+    dockerContext: .
+    healthCheckPath: /health
+    # Solo se vuelve a desplegar si cambia el servidor (o su copia de la charla).
+    buildFilter:
+      paths:
+        - servidor/**
+        - Dockerfile
+    envVars:
+      - key: PRESENTER_TOKEN
+        sync: false

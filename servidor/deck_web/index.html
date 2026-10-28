@@ -1,0 +1,29 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <base href="/deck/">
+
+  <meta charset="UTF-8">
+  <meta content="IE=Edge" http-equiv="X-UA-Compatible">
+  <meta name="description" content="Funciona en mi máquina… y en todas las demás: una charla de Flutter hecha en Flutter.">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+
+  <link rel="icon" type="image/png" href="favicon.png"/>
+
+  <title>Funciona en mi máquina</title>
+  <link rel="manifest" href="manifest.json">
+  <style>
+    /* El mismo fondo de la charla mientras carga: nada de destellos blancos. */
+    html, body { margin: 0; height: 100%; background: #030A17; }
+    #arrancando {
+      position: fixed; inset: 0; display: flex; align-items: center;
+      justify-content: center; color: #5F7395;
+      font: 500 18px/1.4 ui-monospace, Menlo, monospace;
+    }
+  </style>
+</head>
+<body>
+  <div id="arrancando">$ flutter run -d chrome</div>
+  <script src="flutter_bootstrap.js" async></script>
+</body>
+</html>

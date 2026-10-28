@@ -1,0 +1,12 @@
+# Render solo necesita servidor/: lo demás no entra a la imagen.
+# (El guion en servidor/public/moderar/guion.md sí entra.)
+deck/
+contador/
+**/.dart_tool/
+**/build/
+servidor/test/
+servidor/tool/
+.git/
+GUION.md
+PREPARACION.md
+FUENTES.md

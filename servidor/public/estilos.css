@@ -1,0 +1,157 @@
+/* Los mismos colores de la charla: noche de Flutter. */
+:root {
+  --canvas: #030a17;
+  --surface: #071a33;
+  --raised: #0b2447;
+  --ink: #eef4ff;
+  --muted: #94a8c8;
+  --faint: #5f7395;
+  --line: #173055;
+  --sky: #027dfd;
+  --sky-text: #5baaff;
+  --green: #1cdac5;
+  --red: #f25d50;
+  --sans: "Google Sans Flex", system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+  --mono: "Google Sans Code", ui-monospace, Menlo, Consolas, monospace;
+}
+
+* { box-sizing: border-box; }
+
+html, body {
+  margin: 0;
+  background: var(--canvas);
+  color: var(--ink);
+  font-family: var(--sans);
+  -webkit-text-size-adjust: 100%;
+  -webkit-tap-highlight-color: transparent;
+}
+
+body {
+  min-height: 100dvh;
+  padding-bottom: calc(96px + env(safe-area-inset-bottom));
+  background-image: radial-gradient(var(--line) 1px, transparent 1px);
+  background-size: 28px 28px;
+}
+
+button, textarea { font: inherit; color: inherit; }
+
+.barra {
+  position: sticky; top: 0; z-index: 2;
+  display: flex; align-items: center; gap: 8px;
+  padding: calc(10px + env(safe-area-inset-top)) 16px 10px;
+  background: rgba(3, 10, 23, .92);
+  border-bottom: 1px solid var(--line);
+  font: 500 13px/1.2 var(--mono);
+  color: var(--faint);
+}
+.barra .espacio { flex: 1; }
+.punto { width: 8px; height: 8px; border-radius: 50%; background: var(--faint); }
+.punto.vivo { background: var(--green); }
+
+main { padding: 20px 16px 24px; max-width: 560px; margin: 0 auto; }
+
+.yo {
+  padding: 18px 20px; border: 1px solid var(--line); border-radius: 18px;
+  background: var(--surface);
+}
+.etiqueta { margin: 0; font: 600 12px/1 var(--mono); letter-spacing: .12em; text-transform: uppercase; color: var(--faint); }
+.widget { margin: 8px 0 4px; font: 600 30px/1.1 var(--mono); color: var(--sky-text); word-break: break-word; }
+.widget .parentesis { color: var(--faint); }
+.frase { margin: 0; color: var(--muted); font-size: 16px; }
+
+.pantalla { margin-top: 20px; }
+.pantalla h2 { margin: 0 0 6px; font-size: 26px; line-height: 1.15; letter-spacing: -.01em; }
+.pantalla .ayuda { margin: 0 0 18px; color: var(--muted); }
+
+.opciones { display: grid; gap: 10px; }
+.opcion {
+  position: relative; overflow: hidden;
+  display: flex; align-items: center; gap: 12px;
+  width: 100%; min-height: 58px; padding: 14px 16px;
+  border: 1.5px solid var(--line); border-radius: 14px;
+  background: var(--surface); text-align: left; font-size: 18px; font-weight: 500;
+  cursor: pointer;
+}
+.opcion .barrita {
+  position: absolute; inset: 0 auto 0 0; width: 0;
+  background: rgba(2, 125, 253, .16); transition: width .5s cubic-bezier(.2, 0, 0, 1);
+}
+.opcion .texto { position: relative; flex: 1; }
+.opcion .porcentaje { position: relative; font: 500 14px var(--mono); color: var(--muted); }
+.opcion .marca { position: relative; width: 22px; height: 22px; border-radius: 6px; border: 1.5px solid var(--faint); flex: none; }
+.opcion.elegida { border-color: var(--sky); }
+.opcion.elegida .marca { background: var(--sky); border-color: var(--sky); box-shadow: inset 0 0 0 4px var(--surface); }
+.opcion.correcta { border-color: var(--green); }
+.opcion.correcta .porcentaje::before { content: "✓ "; color: var(--green); }
+.opcion.incorrecta { opacity: .55; }
+
+.boton {
+  display: block; width: 100%; margin-top: 14px; padding: 15px 18px;
+  border: 0; border-radius: 14px; background: var(--sky); color: #fff;
+  font-weight: 600; font-size: 17px; cursor: pointer;
+}
+.boton:disabled { opacity: .45; }
+
+.nota { min-height: 1.2em; margin: 10px 0 0; color: var(--muted); font-size: 15px; }
+
+.contador { display: grid; justify-items: center; gap: 18px; padding-top: 6px; }
+.contador .total { font: 600 64px/1 var(--mono); font-variant-numeric: tabular-nums; }
+.mas {
+  width: min(62vw, 240px); aspect-ratio: 1; border-radius: 50%;
+  border: 0; background: var(--sky); color: #fff;
+  font: 300 120px/1 var(--sans);
+  box-shadow: 0 18px 40px rgba(2, 125, 253, .35);
+  touch-action: manipulation; user-select: none; cursor: pointer;
+  transition: transform .08s;
+}
+.mas:active { transform: scale(.94); }
+
+.formulario textarea {
+  width: 100%; padding: 14px; border-radius: 14px;
+  border: 1.5px solid var(--line); background: var(--surface);
+  font-size: 17px; resize: vertical;
+}
+.formulario textarea:focus { outline: none; border-color: var(--sky); }
+
+.lista { display: grid; gap: 10px; margin: 0; padding: 0; list-style: none; }
+.lista li {
+  display: flex; gap: 12px; align-items: flex-start;
+  padding: 14px 16px; border: 1px solid var(--line); border-radius: 14px; background: var(--surface);
+}
+.lista .cuerpo { flex: 1; }
+.lista .autor { display: block; margin-top: 4px; font: 500 12px var(--mono); color: var(--faint); }
+.lista .apoyo {
+  flex: none; min-width: 58px; padding: 8px 10px; border-radius: 10px;
+  border: 1.5px solid var(--line); background: var(--raised); font: 600 14px var(--mono); cursor: pointer;
+}
+.lista .apoyo.hecho { border-color: var(--sky); color: var(--sky-text); }
+.lista .respondida { opacity: .5; }
+
+.estrellas { display: flex; justify-content: center; gap: 8px; margin: 10px 0 8px; }
+.estrella {
+  width: 56px; height: 56px; border-radius: 14px; border: 1.5px solid var(--line);
+  background: var(--surface); font-size: 30px; color: var(--faint); cursor: pointer;
+}
+.estrella.encendida { color: #ffd25e; border-color: #ffd25e; }
+.leyenda { text-align: center; font: 500 16px var(--mono); color: var(--sky-text); min-height: 1.3em; }
+
+.preguntar {
+  margin-top: 28px; padding: 14px 16px; border: 1px dashed var(--line); border-radius: 14px;
+}
+.preguntar summary { cursor: pointer; color: var(--muted); }
+.preguntar[open] summary { margin-bottom: 12px; }
+
+.reacciones {
+  position: fixed; left: 0; right: 0; bottom: 0; z-index: 2;
+  display: flex; justify-content: center; gap: 10px;
+  padding: 10px 16px calc(10px + env(safe-area-inset-bottom));
+  background: rgba(3, 10, 23, .94); border-top: 1px solid var(--line);
+}
+.reacciones button {
+  display: grid; justify-items: center; gap: 2px;
+  min-width: 84px; padding: 8px 10px; border-radius: 14px;
+  border: 1px solid var(--line); background: var(--surface); cursor: pointer;
+}
+.reacciones span { font-size: 26px; line-height: 1; }
+.reacciones small { font: 500 11px var(--mono); color: var(--faint); }
+.reacciones button:active { transform: scale(.94); }

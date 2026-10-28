@@ -1,0 +1,234 @@
+<!doctype html>
+<html lang="es">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <meta name="theme-color" content="#030A17">
+  <meta name="robots" content="noindex">
+  <title>Moderar · Descubriendo Flutter</title>
+  <link rel="stylesheet" href="/estilos.css">
+  <style>
+    body { padding-bottom: 24px; }
+    .grupo { margin-top: 26px; }
+    .grupo h2 { font-size: 20px; margin: 0 0 10px; }
+    .acciones { display: flex; gap: 8px; flex: none; }
+    .acciones button {
+      padding: 8px 12px; border-radius: 10px; border: 1.5px solid var(--line);
+      background: var(--raised); font: 600 13px var(--mono); cursor: pointer;
+    }
+    .acciones .si { border-color: var(--green); color: var(--green); }
+    .acciones .no { border-color: var(--red); color: var(--red); }
+    .cifras { display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px; }
+    .cifra { padding: 12px; border: 1px solid var(--line); border-radius: 14px; background: var(--surface); }
+    .cifra b { display: block; font: 600 26px var(--mono); }
+    .cifra span { font: 500 12px var(--mono); color: var(--faint); }
+    #acceso { display: grid; gap: 10px; }
+    .ahora { padding: 18px 18px 8px; border: 1.5px solid var(--sky); border-radius: 16px; background: var(--surface); }
+    .ahora .donde { font: 600 13px var(--mono); color: var(--sky-text); letter-spacing: .04em; }
+    .ahora h2 { margin: 6px 0 4px; font-size: 24px; }
+    .ahora .meta { font: 500 13px var(--mono); color: var(--faint); }
+    .ahora ul { margin: 12px 0 10px; padding-left: 20px; }
+    .ahora li { margin-bottom: 8px; font-size: 18px; line-height: 1.4; }
+    .despues { margin: 8px 0 0; font: 500 14px var(--mono); color: var(--faint); }
+    .control { display: grid; grid-template-columns: 1fr 1.6fr; gap: 10px; margin: 12px 0 4px; }
+    .control button { padding: 22px 10px; border-radius: 16px; border: 0; font: 700 20px var(--sans); cursor: pointer; }
+    .control .atras { background: var(--raised); color: var(--ink); }
+    .control .adelante { background: var(--sky); color: #fff; }
+    #acceso input {
+      padding: 14px; border-radius: 14px; border: 1.5px solid var(--line);
+      background: var(--surface); color: var(--ink); font: 17px var(--mono);
+    }
+  </style>
+</head>
+<body>
+  <header class="barra">
+    <span class="punto" id="punto"></span>
+    <span id="estado">sin conectar</span>
+    <span class="espacio"></span>
+    <span>moderación</span>
+  </header>
+  <main>
+    <form id="acceso">
+      <input id="token" type="password" placeholder="Token del presentador" autocomplete="off">
+      <button class="boton" type="submit">Entrar</button>
+    </form>
+
+    <section id="panel" hidden>
+      <div class="ahora">
+        <div class="donde" id="donde">esperando a la charla…</div>
+        <h2 id="titulo"></h2>
+        <div class="meta" id="meta"></div>
+        <ul id="notas"></ul>
+      </div>
+      <div class="control">
+        <button class="atras" id="atras" type="button">← Anterior</button>
+        <button class="adelante" id="adelante" type="button">Siguiente →</button>
+      </div>
+      <p class="despues" id="despues"></p>
+      <div class="cifras" style="margin-top:18px">
+        <div class="cifra"><b id="conectados">0</b><span>conectados</span></div>
+        <div class="cifra"><b id="contador">0</b><span>toques</span></div>
+        <div class="cifra"><b id="estrellas">–</b><span>estrellas</span></div>
+      </div>
+      <div class="grupo"><h2>Excusas por revisar</h2><ul class="lista" id="excusasPendientes"></ul></div>
+      <div class="grupo"><h2>Preguntas por revisar</h2><ul class="lista" id="preguntasPendientes"></ul></div>
+      <div class="grupo"><h2>Preguntas en pantalla</h2><ul class="lista" id="preguntasAprobadas"></ul></div>
+      <div class="grupo"><h2>Excusas en pantalla</h2><ul class="lista" id="excusasAprobadas"></ul></div>
+      <button class="boton" id="reiniciar" type="button">Reiniciar el contador</button>
+    </section>
+  </main>
+
+  <script>
+    // Solo se pinta texto (textContent): lo que escribe el público nunca se
+    // interpreta como HTML.
+    (() => {
+      const $ = (id) => document.getElementById(id);
+      let socket = null;
+
+      const token = new URLSearchParams(location.search).get('token') || localStorage.getItem('charla.token') || '';
+      $('token').value = token;
+      if (token) conectar(token);
+
+      $('acceso').addEventListener('submit', (evento) => {
+        evento.preventDefault();
+        conectar($('token').value.trim());
+      });
+
+      function conectar(clave) {
+        if (!clave) return;
+        try { localStorage.setItem('charla.token', clave); } catch { /* sin almacenamiento */ }
+        const protocolo = location.protocol === 'https:' ? 'wss' : 'ws';
+        socket = new WebSocket(`${protocolo}://${location.host}/ws?rol=presentador&token=${encodeURIComponent(clave)}`);
+        socket.onopen = () => {
+          $('punto').classList.add('vivo');
+          $('estado').textContent = 'en vivo';
+          $('acceso').hidden = true;
+          $('panel').hidden = false;
+        };
+        socket.onmessage = (evento) => {
+          const estado = JSON.parse(evento.data);
+          if (estado.t === 'estado') pintar(estado);
+        };
+        socket.onclose = () => {
+          $('punto').classList.remove('vivo');
+          $('estado').textContent = 'desconectado: revisa el token';
+          setTimeout(() => conectar(clave), 3000);
+        };
+      }
+
+      const enviar = (mensaje) => socket && socket.readyState === 1 && socket.send(JSON.stringify(mensaje));
+
+      function fila(texto, autor, botones) {
+        const item = document.createElement('li');
+        const cuerpo = document.createElement('div');
+        cuerpo.className = 'cuerpo';
+        const parrafo = document.createElement('span');
+        parrafo.textContent = texto;
+        const quien = document.createElement('span');
+        quien.className = 'autor';
+        quien.textContent = autor;
+        cuerpo.append(parrafo, quien);
+        const acciones = document.createElement('div');
+        acciones.className = 'acciones';
+        for (const [etiqueta, clase, accion] of botones) {
+          const boton = document.createElement('button');
+          boton.type = 'button';
+          boton.className = clase;
+          boton.textContent = etiqueta;
+          boton.addEventListener('click', accion);
+          acciones.append(boton);
+        }
+        item.append(cuerpo, acciones);
+        return item;
+      }
+
+      // El guion: «## id · Título · tiempo» y debajo las notas en viñetas.
+      let guion = [];
+      fetch('/moderar/guion.md').then((r) => r.text()).then((texto) => {
+        let actual = null;
+        for (const linea of texto.split('\n')) {
+          if (linea.startsWith('## ')) {
+            const [id, titulo, meta] = linea.slice(3).split(' · ');
+            actual = { id: id.trim(), titulo: (titulo || '').trim(), meta: (meta || '').trim(), notas: [] };
+            guion.push(actual);
+          } else if (actual && linea.startsWith('- ')) {
+            actual.notas.push(linea.slice(2));
+          }
+        }
+      });
+
+      function pintarGuion(diapositiva) {
+        if (!diapositiva || !diapositiva.id) return;
+        const indice = guion.findIndex((s) => s.id === diapositiva.id);
+        const seccion = guion[indice];
+        $('donde').textContent = `${diapositiva.indice}/${diapositiva.total} · paso ${diapositiva.paso}/${diapositiva.pasos}`;
+        $('titulo').textContent = seccion ? seccion.titulo : diapositiva.titulo;
+        $('meta').textContent = seccion ? seccion.meta : '';
+        $('notas').replaceChildren(...(seccion ? seccion.notas : []).map((nota) => {
+          const item = document.createElement('li');
+          item.textContent = nota;
+          return item;
+        }));
+        const siguiente = guion[indice + 1];
+        $('despues').textContent = siguiente ? `Después: ${siguiente.titulo}` : '';
+      }
+
+      $('adelante').addEventListener('click', () => {
+        enviar({ t: 'nav', dir: 'next' });
+        if (navigator.vibrate) navigator.vibrate(10);
+      });
+      $('atras').addEventListener('click', () => enviar({ t: 'nav', dir: 'prev' }));
+
+      function pintar(estado) {
+        pintarGuion(estado.slide);
+        $('conectados').textContent = estado.connected;
+        $('contador').textContent = estado.counter;
+        $('estrellas').textContent = estado.rating.total ? estado.rating.average.toFixed(1) : '–';
+        const listas = {
+          excusasPendientes: [], preguntasPendientes: [], preguntasAprobadas: [], excusasAprobadas: [],
+        };
+        for (const excusa of estado.excuses) {
+          if (excusa.hidden) continue;
+          const decidir = (t) => () => enviar({ t, tipo: 'excusa', id: excusa.id });
+          if (excusa.approved) {
+            listas.excusasAprobadas.push(fila(excusa.text, excusa.author, [['Quitar', 'no', decidir('ocultar')]]));
+          } else {
+            listas.excusasPendientes.push(fila(excusa.text, excusa.author, [
+              ['Aprobar', 'si', decidir('aprobar')], ['Ocultar', 'no', decidir('ocultar')],
+            ]));
+          }
+        }
+        const preguntas = [...estado.questions].sort((a, b) => b.votes - a.votes);
+        for (const pregunta of preguntas) {
+          if (pregunta.hidden) continue;
+          const decidir = (t) => () => enviar({ t, tipo: 'pregunta', id: pregunta.id });
+          const autor = `${pregunta.author} · +${pregunta.votes}${pregunta.done ? ' · respondida' : ''}`;
+          if (pregunta.approved) {
+            listas.preguntasAprobadas.push(fila(pregunta.text, autor, [
+              [pregunta.done ? 'Reabrir' : 'Respondida', '', () => enviar({ t: 'respondida', id: pregunta.id })],
+              ['Quitar', 'no', decidir('ocultar')],
+            ]));
+          } else {
+            listas.preguntasPendientes.push(fila(pregunta.text, autor, [
+              ['Aprobar', 'si', decidir('aprobar')], ['Ocultar', 'no', decidir('ocultar')],
+            ]));
+          }
+        }
+        for (const [id, items] of Object.entries(listas)) {
+          const lista = $(id);
+          lista.replaceChildren(...items);
+          if (!items.length) {
+            const vacio = document.createElement('li');
+            vacio.textContent = 'Nada por ahora.';
+            lista.append(vacio);
+          }
+        }
+      }
+
+      $('reiniciar').addEventListener('click', () => {
+        if (confirm('¿Reiniciar el contador a cero?')) enviar({ t: 'reiniciar', que: 'contador' });
+      });
+    })();
+  </script>
+</body>
+</html>

@@ -1,0 +1,43 @@
+name: deck
+description: "Funciona en mi máquina… y en todas las demás: una charla de Flutter hecha en Flutter."
+publish_to: 'none'
+version: 1.0.0+1
+
+environment:
+  sdk: ^3.13.7
+  flutter: ">=3.47.8"
+
+dependencies:
+  flutter:
+    sdk: flutter
+  http: ^1.6.0
+  material_ui: ^1.8.0
+  qr: ^3.0.2
+  web: ^1.1.1
+  web_socket_channel: ^3.0.3
+
+dev_dependencies:
+  flutter_lints: ^6.0.0
+  flutter_test:
+    sdk: flutter
+
+flutter:
+  # Web solo para este proyecto: la configuración global de Flutter queda igual.
+  config:
+    enable-web: true
+
+  uses-material-design: true
+
+  assets:
+    - assets/brand/
+    - assets/media/
+
+  fonts:
+    - family: GoogleSansFlex
+      fonts:
+        - asset: assets/fonts/GoogleSansFlex.ttf
+    - family: GoogleSansCode
+      fonts:
+        - asset: assets/fonts/GoogleSansCode.ttf
+        - asset: assets/fonts/GoogleSansCode-Italic.ttf
+          style: italic

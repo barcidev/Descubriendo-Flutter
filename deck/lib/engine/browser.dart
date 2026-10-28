@@ -1,0 +1,34 @@
+import 'browser_stub.dart' if (dart.library.js_interop) 'browser_web.dart'
+    as platform;
+
+/// Lo poco que la charla le pide al navegador: la URL, pantalla completa,
+/// almacenamiento local y un canal entre ventanas (la del presentador).
+///
+/// En los tests corre la versión vacía, que no toca nada.
+abstract interface class Browser {
+  static Browser get current => platform.createBrowser();
+
+  Uri get uri;
+
+  /// Reemplaza el `#…` de la URL sin agregar entradas al historial.
+  void replaceHash(String hash);
+
+  void toggleFullscreen();
+
+  String? read(String key);
+
+  void write(String key, String value);
+
+  void openWindow(String url, String name);
+
+  MessageChannel channel(String name);
+}
+
+/// Mensajes de texto entre pestañas del mismo origen (BroadcastChannel).
+abstract interface class MessageChannel {
+  Stream<String> get messages;
+
+  void post(String message);
+
+  void close();
+}

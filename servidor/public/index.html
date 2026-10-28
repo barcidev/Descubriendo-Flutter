@@ -1,0 +1,48 @@
+<!doctype html>
+<html lang="es">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <meta name="theme-color" content="#030A17">
+  <title>Descubriendo Flutter · en vivo</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Google+Sans+Code:wght@400;600&family=Google+Sans+Flex:wght@400;500;600;700&display=swap">
+  <link rel="stylesheet" href="/estilos.css">
+</head>
+<body>
+  <header class="barra">
+    <span class="punto" id="punto"></span>
+    <span id="estado">conectando…</span>
+    <span class="espacio"></span>
+    <span id="conectados"></span>
+  </header>
+
+  <main>
+    <section class="yo" id="yo" hidden>
+      <p class="etiqueta">Hoy eres</p>
+      <h1 class="widget"><span id="widget"></span><span class="parentesis">()</span></h1>
+      <p class="frase" id="frase"></p>
+    </section>
+
+    <section id="pantalla" class="pantalla" aria-live="polite"></section>
+
+    <details class="preguntar" id="preguntar">
+      <summary>¿Tienes una pregunta? Escríbela cuando quieras</summary>
+      <form id="formPregunta" class="formulario">
+        <textarea id="textoPregunta" maxlength="200" rows="3" placeholder="Tu pregunta para el final de la charla"></textarea>
+        <button type="submit" class="boton">Enviar pregunta</button>
+        <p class="nota" id="notaPregunta"></p>
+      </form>
+    </details>
+  </main>
+
+  <nav class="reacciones" aria-label="Reacciones">
+    <button type="button" data-r="fuego"><span>🔥</span><small>hot reload</small></button>
+    <button type="button" data-r="bug"><span>🐛</span><small>bug</small></button>
+    <button type="button" data-r="aplauso"><span>👏</span><small>aplauso</small></button>
+  </nav>
+
+  <script src="/app.js"></script>
+</body>
+</html>
