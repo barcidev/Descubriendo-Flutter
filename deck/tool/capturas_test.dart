@@ -139,6 +139,52 @@ void main() {
     await _wait(tester, 300);
   });
 
+  // Con servidor, el QR va en el encabezado de cada votación y les quita
+  // alto: así se ven en la charla.
+  testWidgets('votaciones con QR', (tester) async {
+    tester.view.physicalSize = const Size(1920, 1080);
+    tester.view.devicePixelRatio = 1;
+    addTearDown(tester.view.reset);
+    final browser = Browser.current..write('charla.servidor', 'https://flutter-baq.onrender.com');
+    addTearDown(() => browser.write('charla.servidor', ''));
+    const ids = {
+      'calentamiento',
+      'hecha-con-flutter',
+      'si-depende-no',
+      'pregunta-incomoda',
+      'cual-es-dart',
+      'publicar',
+    };
+    final slides = buildDeck().where((slide) => ids.contains(slide.id)).toList();
+
+    await tester.pumpWidget(DeckApp(browser: browser, slides: slides));
+    await tester.runAsync(() async {
+      await precacheImage(
+        const AssetImage('assets/brand/flutter_mark.png'),
+        tester.element(find.byType(DeckShell)),
+      );
+    });
+    await tester.tap(find.text('Presentar sin servidor (mano alzada)'));
+    await _wait(tester, 600);
+    await _key(tester, LogicalKeyboardKey.keyS);
+
+    for (final (index, slide) in slides.indexed) {
+      for (var step = 0; step < slide.steps; step++) {
+        if (step > 0) await _key(tester, LogicalKeyboardKey.arrowRight);
+        await _wait(tester, 3200);
+        await _shot(tester, 'qr-${slide.id}-paso-${step + 1}');
+      }
+      if (index < slides.length - 1) {
+        await _key(tester, LogicalKeyboardKey.arrowRight);
+        await _wait(tester, 900);
+      }
+    }
+
+    await _key(tester, LogicalKeyboardKey.keyS);
+    await tester.pumpWidget(const SizedBox());
+    await _wait(tester, 300);
+  });
+
   testWidgets('pantalla de entrada del presentador', (tester) async {
     tester.view.physicalSize = const Size(1920, 1080);
     tester.view.devicePixelRatio = 1;

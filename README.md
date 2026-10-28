@@ -105,4 +105,5 @@ cd servidor && fvm dart analyze && fvm dart test
 ## Créditos y licencias
 
 - Fuentes Google Sans Flex y Google Sans Code, bajo la SIL Open Font License 1.1 (licencias en `deck/assets/fonts/`).
+- Logos de las apps del quiz (Google Pay, Nubank, WhatsApp, BMW, Uber, NotebookLM e Instagram): trazos de [Simple Icons](https://simpleicons.org) 16.30.0, bajo CC0. Son marcas de sus dueños y aquí solo identifican cada app.
 - Flutter y el logo relacionado son marcas comerciales de Google LLC. Esta charla no está respaldada por Google LLC ni afiliada a ella. El logo se usa sin alterar, según [flutter.dev/brand](https://flutter.dev/brand).

@@ -319,6 +319,8 @@ class VoteBar extends StatelessWidget {
         child: ClipRRect(
           borderRadius: BorderRadius.circular(Radii.sm),
           child: Stack(
+            // El texto va centrado en el alto de la barra.
+            alignment: AlignmentDirectional.centerStart,
             children: [
               TweenAnimationBuilder<double>(
                 tween: Tween(end: share.clamp(0, 1)),

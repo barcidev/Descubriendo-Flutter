@@ -9,6 +9,7 @@ import '../live/join_card.dart';
 import '../live/live_models.dart';
 import '../theme/deck_theme.dart';
 import '../theme/tokens.dart';
+import '../ui/app_icon.dart';
 import '../ui/blocks.dart';
 import '../ui/reveal.dart';
 import '../ui/slide_scaffold.dart';
@@ -56,6 +57,18 @@ const builtWithFlutterPoll = PollSpec(
     ),
   ],
 );
+
+/// El ícono de cada opción del quiz.
+const _brands = {
+  'gpay': AppBrand.googlePay,
+  'nubank': AppBrand.nubank,
+  'whatsapp': AppBrand.whatsapp,
+  'bmw': AppBrand.bmw,
+  'uber': AppBrand.uber,
+  'notebooklm': AppBrand.notebookLm,
+  'instagram': AppBrand.instagram,
+  'esta': AppBrand.flutter,
+};
 
 final versionSlides = [
   Slide(
@@ -424,7 +437,7 @@ class _BuiltWithFlutter extends StatelessWidget {
       trailing: AnimatedOpacity(
         opacity: step == 0 ? 1 : 0.35,
         duration: Motion.base,
-        child: const JoinCard(compact: true),
+        child: const JoinCard(qrSize: 170, compact: true),
       ),
       child: ListenableBuilder(
         listenable: live,
@@ -435,27 +448,38 @@ class _BuiltWithFlutter extends StatelessWidget {
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               Expanded(
-                child: GridView.count(
-                  crossAxisCount: 4,
-                  mainAxisSpacing: 24,
-                  crossAxisSpacing: 24,
-                  childAspectRatio: 1.62,
-                  physics: const NeverScrollableScrollPhysics(),
-                  children: [
-                    for (final (index, option) in poll.options.indexed)
-                      QuizCard(
-                        index: index,
-                        option: option,
-                        share: results.shareOf(option.id),
-                        votes: results.countOf(option.id),
-                        // La trampa se voltea de última, sola.
-                        revealed: option.id == 'esta' ? step >= 2 : step >= 1,
-                        spotlight: step >= 2 && option.id == 'esta',
-                        dimmed: step >= 2 && option.id != 'esta',
-                      ),
-                  ],
+                // Las dos filas caben siempre, haya o no QR en el encabezado.
+                child: LayoutBuilder(
+                  builder: (context, constraints) {
+                    const columns = 4;
+                    const gap = 24.0;
+                    final width = (constraints.maxWidth - gap * (columns - 1)) / columns;
+                    final height = (constraints.maxHeight - gap) / 2;
+                    return GridView.count(
+                      crossAxisCount: columns,
+                      mainAxisSpacing: gap,
+                      crossAxisSpacing: gap,
+                      childAspectRatio: width / height,
+                      physics: const NeverScrollableScrollPhysics(),
+                      children: [
+                        for (final (index, option) in poll.options.indexed)
+                          QuizCard(
+                            index: index,
+                            option: option,
+                            brand: _brands[option.id]!,
+                            share: results.shareOf(option.id),
+                            votes: results.countOf(option.id),
+                            // La trampa se voltea de última, sola.
+                            revealed: option.id == 'esta' ? step >= 2 : step >= 1,
+                            spotlight: step >= 2 && option.id == 'esta',
+                            dimmed: step >= 2 && option.id != 'esta',
+                          ),
+                      ],
+                    );
+                  },
                 ),
               ),
+              const SizedBox(height: 18),
               SizedBox(
                 height: 44,
                 child: AnimatedSwitcher(
@@ -487,6 +511,7 @@ class QuizCard extends StatelessWidget {
   const QuizCard({
     required this.index,
     required this.option,
+    required this.brand,
     required this.share,
     required this.votes,
     required this.revealed,
@@ -497,6 +522,7 @@ class QuizCard extends StatelessWidget {
 
   final int index;
   final PollOption option;
+  final AppBrand brand;
   final double share;
   final int votes;
   final bool revealed;
@@ -532,12 +558,13 @@ class QuizCard extends StatelessWidget {
                 ..setEntry(3, 2, 0.0012)
                 ..rotateY(turn * math.pi),
               child: front
-                  ? _Front(option: option, share: share, votes: votes, index: index)
+                  ? _Front(option: option, brand: brand, share: share, votes: votes, index: index)
                   : Transform(
                       alignment: Alignment.center,
                       transform: Matrix4.rotationY(math.pi),
                       child: _Back(
                         option: option,
+                        brand: brand,
                         share: share,
                         spotlight: spotlight,
                       ),
@@ -553,12 +580,14 @@ class QuizCard extends StatelessWidget {
 class _Front extends StatelessWidget {
   const _Front({
     required this.option,
+    required this.brand,
     required this.share,
     required this.votes,
     required this.index,
   });
 
   final PollOption option;
+  final AppBrand brand;
   final double share;
   final int votes;
   final int index;
@@ -571,9 +600,16 @@ class _Front extends StatelessWidget {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Text(
-            '${index + 1}',
-            style: DeckType.monoSmall.copyWith(color: colors.faint),
+          Row(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              AppIcon(brand, size: 80),
+              const Spacer(),
+              Text(
+                '${index + 1}',
+                style: DeckType.monoSmall.copyWith(color: colors.faint),
+              ),
+            ],
           ),
           const Spacer(),
           Text(
@@ -599,11 +635,13 @@ class _Front extends StatelessWidget {
 class _Back extends StatelessWidget {
   const _Back({
     required this.option,
+    required this.brand,
     required this.share,
     required this.spotlight,
   });
 
   final PollOption option;
+  final AppBrand brand;
   final double share;
   final bool spotlight;
 
@@ -620,6 +658,8 @@ class _Back extends StatelessWidget {
         children: [
           Row(
             children: [
+              AppIcon(brand, size: 44),
+              const SizedBox(width: 16),
               Icon(yes ? Icons.check_circle : Icons.cancel, color: tone, size: 26),
               const SizedBox(width: 10),
               Text(
